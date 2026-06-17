@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PromptForge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: { extend: {
+        fontFamily: { sans: ["Inter","system-ui","sans-serif"], mono: ["IBM Plex Mono","monospace"] },
+        colors: {
+          ink: { 950:"#0c0e12", 900:"#0f1217", 850:"#13161c", 800:"#181c23", 700:"#222731" },
+          line: "#262b34",
+          steel: { 400:"#7aa2d6", 500:"#5b86bf", 600:"#436aa0" },
+        },
+      }},
+    };
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    body { background: #0c0e12; }
+    .hairline { border-color: #262b34; }
+    .divide-line > * + * { border-top: 1px solid #1c2129; }
+    @keyframes flashIn { from { opacity:0; } to { opacity:1; } }
+    .row-enter { animation: flashIn .18s ease-out; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .blink { animation: blink 1.1s steps(2,start) infinite; }
+    .feed::-webkit-scrollbar { width: 10px; }
+    .feed::-webkit-scrollbar-thumb { background: #262b34; border: 3px solid #0c0e12; border-radius: 99px; }
+    .feed::-webkit-scrollbar-track { background: transparent; }
+    input::placeholder { color: #4b515c; }
+    .tnum { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="text-zinc-300 font-sans antialiased min-h-screen text-[14px]">
+
+  <!-- Top bar -->
+  <header class="border-b hairline bg-ink-950">
+    <div class="max-w-[1200px] mx-auto px-5 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="text-steel-400">
+          <path d="M12 2 4 5.5v6.2c0 4.8 3.3 8.3 8 9.8 4.7-1.5 8-5 8-9.8V5.5L12 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="m8.5 12 2.4 2.4L15.8 9.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="font-semibold text-zinc-100 tracking-tight">PromptForge</span>
+        <span class="text-zinc-600 text-xs hidden sm:inline">/ Prompt Injection Assessment</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <div class="hidden sm:flex items-center gap-2 text-xs text-zinc-500">
+          <span id="liveDot" class="h-1.5 w-1.5 rounded-full bg-zinc-600"></span>
+          <span id="status" class="font-mono">idle</span>
+        </div>
+        <button id="scanBtn"
+          class="px-3.5 py-1.5 rounded bg-steel-600 hover:bg-steel-500 text-white text-[13px] font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+          Run Assessment
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-[1200px] mx-auto px-5 py-6">
+
+    <!-- Target config -->
+    <section class="border hairline rounded bg-ink-900 mb-5">
+      <div class="px-4 py-2.5 border-b hairline flex items-center gap-2">
+        <span class="text-[11px] uppercase tracking-wide text-zinc-500 font-medium">Target Configuration</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 divide-x divide-[#1c2129]">
+        <label class="block px-4 py-3">
+          <span class="text-[11px] text-zinc-500 mb-1.5 block">Base URL</span>
+          <input id="cfgUrl" value="http://localhost:8001/v1" spellcheck="false"
+            class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none" />
+        </label>
+        <label class="block px-4 py-3">
+          <span class="text-[11px] text-zinc-500 mb-1.5 block">Model</span>
+          <input id="cfgModel" value="demo-chatbot" spellcheck="false"
+            class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none" />
+        </label>
+        <label class="block px-4 py-3">
+          <span class="text-[11px] text-zinc-500 mb-1.5 block">API Key</span>
+          <input id="cfgKey" type="password" placeholder="not set" spellcheck="false"
+            class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none" />
+        </label>
+      </div>
+    </section>
+
+    <!-- Stat row -->
+    <section class="border hairline rounded bg-ink-900 mb-5 grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-[#1c2129]">
+      <div class="px-4 py-3">
+        <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-1.5">Attacks Run</p>
+        <p class="text-[22px] font-semibold tnum text-zinc-100 leading-none"><span id="statFired">0</span><span id="statTotal" class="text-zinc-600 text-sm font-normal"></span></p>
+      </div>
+      <div class="px-4 py-3">
+        <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-1.5">Vulnerabilities</p>
+        <p id="statVulns" class="text-[22px] font-semibold tnum text-red-400 leading-none">0</p>
+      </div>
+      <div class="px-4 py-3">
+        <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-1.5">Blocked</p>
+        <p id="statBlocked" class="text-[22px] font-semibold tnum text-emerald-400 leading-none">0</p>
+      </div>
+      <div class="px-4 py-3">
+        <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-1.5">Failure Rate</p>
+        <p id="statRate" class="text-[22px] font-semibold tnum text-zinc-100 leading-none">—</p>
+      </div>
+    </section>
+
+    <!-- Progress -->
+    <div class="relative h-px w-full bg-[#1c2129] mb-6 overflow-hidden">
+      <div id="progress" class="h-px w-0 bg-steel-500 transition-all duration-300"></div>
+    </div>
+    <div id="progressShimmer" class="hidden"></div>
+
+    <!-- Results table -->
+    <section class="border hairline rounded bg-ink-900 overflow-hidden">
+      <div class="px-4 py-2.5 border-b hairline flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2.5">
+          <span class="text-[11px] uppercase tracking-wide text-zinc-400 font-medium">Attack Log</span>
+          <span id="counter" class="font-mono text-[11px] text-zinc-600"></span>
+        </div>
+        <div class="flex items-center gap-1 text-[11px]">
+          <button data-filter="all" class="filter-btn px-2 py-1 rounded font-medium bg-ink-700 text-zinc-200 transition">All</button>
+          <button data-filter="vuln" class="filter-btn px-2 py-1 rounded font-medium text-zinc-500 hover:text-zinc-300 transition">Vulnerable</button>
+          <button data-filter="blocked" class="filter-btn px-2 py-1 rounded font-medium text-zinc-500 hover:text-zinc-300 transition">Blocked</button>
+        </div>
+      </div>
+
+      <!-- column header -->
+      <div class="flex items-center gap-3 px-4 py-2 border-b hairline text-[10px] uppercase tracking-wide text-zinc-600 font-medium">
+        <span class="w-6">#</span><span class="w-14">Result</span><span class="flex-1 min-w-0">Attack Vector</span><span class="w-20">Severity</span><span class="w-10 text-right">Conf.</span>
+      </div>
+
+      <div id="feed" class="feed max-h-[460px] overflow-y-auto divide-line"></div>
+
+      <div id="empty" class="px-4 py-16 text-center text-zinc-600 text-[13px]">
+        No assessment data. Configure a target and run an assessment to populate the attack log.
+      </div>
+    </section>
+
+    <!-- Report -->
+    <section id="report" class="hidden mt-6 border hairline rounded bg-ink-900 overflow-hidden">
+      <div class="px-4 py-2.5 border-b hairline flex items-center justify-between">
+        <span class="text-[11px] uppercase tracking-wide text-zinc-400 font-medium">Assessment Report</span>
+        <button id="exportBtn" class="px-2.5 py-1 rounded border hairline hover:bg-ink-800 text-[12px] text-zinc-300 transition flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Export
+        </button>
+      </div>
+      <div id="reportBody" class="p-5"></div>
+    </section>
+
+    <footer class="mt-8 text-[11px] text-zinc-600 font-mono">PromptForge — for authorized security testing only</footer>
+  </main>
+
+  <script>
+    const SEV_COLOR = {
+      critical: "text-red-400",
+      high:     "text-orange-400",
+      medium:   "text-amber-400",
+      low:      "text-sky-400",
+      info:     "text-zinc-400",
+    };
+    const SEV_BAR = { critical:"bg-red-500", high:"bg-orange-500", medium:"bg-amber-500", low:"bg-sky-500", info:"bg-zinc-500" };
+
+    const state = { fired:0, total:0, vulns:0, blocked:0, results:[] };
+    const $ = (id) => document.getElementById(id);
+
+    function tick(el, to) {
+      const from = parseInt(el.textContent) || 0;
+      if (from === to) return;
+      const step = to > from ? 1 : -1; let cur = from;
+      const iv = setInterval(() => { cur += step; el.textContent = cur; if (cur === to) clearInterval(iv); }, 30);
+    }
+
+    function renderStats() {
+      tick($("statFired"), state.fired);
+      $("statTotal").textContent = state.total ? ` / ${state.total}` : "";
+      tick($("statVulns"), state.vulns);
+      tick($("statBlocked"), state.blocked);
+      const rate = state.fired ? Math.round((state.vulns/state.fired)*100) : 0;
+      $("statRate").textContent = state.fired ? rate + "%" : "—";
+      $("statRate").className = "text-[22px] font-semibold tnum leading-none " + (rate>=30?"text-red-400":rate>0?"text-amber-400":"text-zinc-100");
+      $("progress").style.width = state.total ? (state.fired/state.total)*100 + "%" : "0%";
+      $("counter").textContent = state.total ? `${state.fired} / ${state.total}` : "";
+    }
+
+    let activeFilter = "all";
+    function applyFilter() {
+      document.querySelectorAll("#feed > [data-verdict]").forEach(row => {
+        const show = activeFilter === "all" || activeFilter === row.dataset.verdict;
+        row.classList.toggle("hidden", !show);
+      });
+    }
+
+    function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+    function addRow(a) {
+      $("empty").classList.add("hidden");
+      const resultCell = a.succeeded
+        ? `<span class="inline-flex items-center gap-1.5 text-red-400 font-medium"><span class="h-1.5 w-1.5 rounded-full bg-red-500"></span>FAIL</span>`
+        : `<span class="inline-flex items-center gap-1.5 text-emerald-400 font-medium"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>PASS</span>`;
+
+      const row = document.createElement("div");
+      row.dataset.verdict = a.succeeded ? "vuln" : "blocked";
+      row.className = "row-enter group";
+
+      row.innerHTML = `
+        <div class="summary flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-ink-850 transition text-[13px]">
+          <span class="w-6 font-mono text-zinc-600 text-xs shrink-0">${String(a.index).padStart(2,"0")}</span>
+          <span class="w-14 shrink-0">${resultCell}</span>
+          <span class="flex-1 min-w-0 font-mono text-zinc-400 truncate">${escapeHtml(a.category)} <span class="text-zinc-600">·</span> ${escapeHtml(a.technique)}</span>
+          <span class="w-20 shrink-0 ${SEV_COLOR[a.severity]||SEV_COLOR.info} text-xs font-medium uppercase tracking-wide">${a.severity}</span>
+          <span class="w-10 shrink-0 font-mono text-zinc-500 text-xs text-right">${a.confidence.toFixed(2)}</span>
+        </div>
+        <div class="detail hidden px-4 pb-3 pt-0 sm:pl-[52px]">
+          <div class="border-l-2 ${a.succeeded?'border-red-500/40':'border-emerald-500/40'} pl-3 font-mono text-[12.5px] leading-relaxed space-y-1.5">
+            <p class="text-zinc-400"><span class="text-zinc-600 select-none">payload   </span>${escapeHtml(a.prompt)}</p>
+            <p class="${a.succeeded?'text-red-300':'text-zinc-400'}"><span class="text-zinc-600 select-none">response  </span>${escapeHtml(a.response)}</p>
+          </div>
+        </div>`;
+
+      row.querySelector(".summary").addEventListener("click", () => {
+        row.querySelector(".detail").classList.toggle("hidden");
+      });
+
+      $("feed").prepend(row);
+      if (activeFilter !== "all" && activeFilter !== row.dataset.verdict) row.classList.add("hidden");
+      $("feed").scrollTop = 0;
+    }
+
+    function renderReport() {
+      const rate = state.fired ? Math.round((state.vulns/state.fired)*100) : 0;
+      const grade = rate>=50?"F":rate>=30?"D":rate>=15?"C":rate>0?"B":"A";
+      const gradeColor = rate>=30?"text-red-400":rate>0?"text-amber-400":"text-emerald-400";
+      const bySev = {};
+      state.results.filter(r=>r.succeeded).forEach(r=>bySev[r.severity]=(bySev[r.severity]||0)+1);
+      const order = ["critical","high","medium","low","info"];
+      const maxN = Math.max(1, ...Object.values(bySev));
+      const sevLines = order.filter(s=>bySev[s]).map(s=>`
+        <div class="flex items-center gap-3 text-[13px]">
+          <span class="w-14 capitalize text-zinc-400">${s}</span>
+          <div class="flex-1 h-1.5 bg-[#1c2129] overflow-hidden rounded-sm">
+            <div class="h-full ${SEV_BAR[s]}" style="width:${(bySev[s]/maxN)*100}%"></div>
+          </div>
+          <span class="w-5 text-right font-mono tnum text-zinc-300">${bySev[s]}</span>
+        </div>`).join("") || `<p class="text-[13px] text-emerald-400">No vulnerabilities identified.</p>`;
+
+      $("reportBody").innerHTML = `
+        <div class="flex items-start gap-5 mb-5">
+          <div class="h-20 w-20 shrink-0 rounded grid place-items-center border hairline bg-ink-850">
+            <span class="text-5xl font-bold ${gradeColor}">${grade}</span>
+          </div>
+          <div class="text-[13px] text-zinc-400 space-y-1 pt-1">
+            <p class="text-zinc-100 text-[15px] font-medium">${state.vulns} of ${state.fired} attacks succeeded — ${rate}% failure rate</p>
+            <p>Target classified as <span class="${gradeColor} font-medium">${rate>=50?'critically':rate>=30?'highly':rate>0?'partially':'not'} vulnerable</span> to prompt injection.</p>
+            <p class="text-zinc-500 text-xs pt-0.5">${state.fired} payloads · ${new Set(state.results.map(r=>r.category)).size} attack categories · ${$("cfgModel").value}</p>
+          </div>
+        </div>
+        <div class="border-t hairline pt-4">
+          <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-3">Successful Attacks by Severity</p>
+          <div class="space-y-2 max-w-md">${sevLines}</div>
+        </div>`;
+      $("report").classList.remove("hidden");
+    }
+
+    function setStatus(text, color, pulse) {
+      $("status").textContent = text;
+      $("status").className = "font-mono " + color;
+      $("liveDot").className = "h-1.5 w-1.5 rounded-full " + color.replace("text-","bg-") + (pulse?" blink":"");
+    }
+
+    function startScan() {
+      Object.assign(state,{fired:0,total:0,vulns:0,blocked:0,results:[]});
+      $("feed").innerHTML=""; $("report").classList.add("hidden");
+      $("empty").classList.remove("hidden");
+      $("scanBtn").disabled=true;
+      setStatus("running","text-steel-400",true);
+      renderStats();
+
+      const es = new EventSource("/events");
+      es.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type==="attack") {
+          const a = msg.data;
+          state.fired=a.index; state.total=a.total;
+          a.succeeded?state.vulns++:state.blocked++;
+          state.results.push(a); addRow(a); renderStats();
+        } else if (msg.type==="done") {
+          es.close(); $("scanBtn").disabled=false;
+          setStatus("complete","text-emerald-400",false);
+          renderReport();
+        }
+      };
+      es.onerror = () => { es.close(); $("scanBtn").disabled=false; setStatus("error","text-red-400",false); };
+      fetch("/scan",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({
+        base_url: $("cfgUrl").value, model: $("cfgModel").value, api_key: $("cfgKey").value,
+      })});
+    }
+
+    function exportReport() {
+      const rate = state.fired ? Math.round((state.vulns/state.fired)*100) : 0;
+      const grade = rate>=50?"F":rate>=30?"D":rate>=15?"C":rate>0?"B":"A";
+      const lines = [
+        "# PromptForge — Assessment Report","",
+        `Target:        ${$("cfgModel").value} (${$("cfgUrl").value})`,
+        `Generated:     ${new Date().toISOString()}`,
+        `Grade:         ${grade}`,
+        `Attacks run:   ${state.fired}`,
+        `Succeeded:     ${state.vulns} (${rate}% failure rate)`,
+        `Blocked:       ${state.blocked}`,
+        "","## Successful Attacks","",
+      ];
+      state.results.filter(r=>r.succeeded).forEach(r=>{
+        lines.push(`- [${r.severity.toUpperCase()}] ${r.attack_id} · ${r.category} / ${r.technique} (conf ${r.confidence})`);
+        lines.push(`    payload  > ${r.prompt}`);
+        lines.push(`    response < ${r.response}`);
+      });
+      const blob = new Blob([lines.join("\n")], { type:"text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `promptforge-report-${Date.now()}.md`; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.querySelectorAll(".filter-btn").forEach(btn => btn.addEventListener("click", () => {
+      activeFilter = btn.dataset.filter;
+      document.querySelectorAll(".filter-btn").forEach(b => {
+        const on = b === btn;
+        b.className = "filter-btn px-2 py-1 rounded font-medium transition " +
+          (on ? "bg-ink-700 text-zinc-200" : "text-zinc-500 hover:text-zinc-300");
+      });
+      applyFilter();
+    }));
+
+    $("exportBtn").addEventListener("click", exportReport);
+    $("scanBtn").addEventListener("click", startScan);
+  </script>
+</body>
+</html>
