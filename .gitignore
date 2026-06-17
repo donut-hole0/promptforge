@@ -1,9 +1,6 @@
 .env
-.env.*
-!.env.example
 __pycache__/
-*.py[cod]
-.cache/
+*.pyc
 .venv/
 *.egg-info/
 dist/
