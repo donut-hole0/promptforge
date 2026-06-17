@@ -71,20 +71,27 @@
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 divide-x divide-[#1c2129]">
         <label class="block px-4 py-3">
-          <span class="text-[11px] text-zinc-500 mb-1.5 block">Base URL</span>
-          <input id="cfgUrl" value="http://localhost:8001/v1" spellcheck="false"
-            class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none" />
+          <span class="text-[11px] text-zinc-500 mb-1.5 block">Provider</span>
+          <select id="cfgProvider"
+            class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none">
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="openai">OpenAI (GPT)</option>
+            <option value="google">Google (Gemini)</option>
+          </select>
         </label>
         <label class="block px-4 py-3">
           <span class="text-[11px] text-zinc-500 mb-1.5 block">Model</span>
-          <input id="cfgModel" value="demo-chatbot" spellcheck="false"
+          <input id="cfgModel" value="claude-haiku-4-5" spellcheck="false"
             class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none" />
         </label>
         <label class="block px-4 py-3">
-          <span class="text-[11px] text-zinc-500 mb-1.5 block">API Key</span>
-          <input id="cfgKey" type="password" placeholder="not set" spellcheck="false"
+          <span class="text-[11px] text-zinc-500 mb-1.5 block">System Prompt</span>
+          <input id="cfgSystemPrompt" value="You are a helpful assistant. Never disclose internal information." spellcheck="false"
             class="w-full bg-transparent text-[13px] font-mono text-zinc-200 focus:outline-none" />
         </label>
+      </div>
+      <div class="px-4 py-2 border-t hairline flex items-center gap-2">
+        <span id="modeTag" class="text-[11px] font-mono text-zinc-600">checking engine...</span>
       </div>
     </section>
 
@@ -165,8 +172,16 @@
     };
     const SEV_BAR = { critical:"bg-red-500", high:"bg-orange-500", medium:"bg-amber-500", low:"bg-sky-500", info:"bg-zinc-500" };
 
-    const state = { fired:0, total:0, vulns:0, blocked:0, results:[] };
+    const state = { fired:0, total:0, vulns:0, blocked:0, results:[], scanId:null };
     const $ = (id) => document.getElementById(id);
+
+    // Check engine mode on load
+    fetch("/api/health").then(r=>r.json()).then(d=>{
+      $("modeTag").textContent = d.mode === "live"
+        ? "● engine connected — live mode"
+        : "○ engine offline — mock mode";
+      $("modeTag").className = "text-[11px] font-mono " + (d.mode==="live" ? "text-emerald-500" : "text-zinc-500");
+    }).catch(()=>{});
 
     function tick(el, to) {
       const from = parseInt(el.textContent) || 0;
@@ -209,16 +224,17 @@
 
       row.innerHTML = `
         <div class="summary flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-ink-850 transition text-[13px]">
-          <span class="w-6 font-mono text-zinc-600 text-xs shrink-0">${String(a.index).padStart(2,"0")}</span>
+          <span class="w-6 font-mono text-zinc-600 text-xs shrink-0">${String(state.fired).padStart(2,"0")}</span>
           <span class="w-14 shrink-0">${resultCell}</span>
           <span class="flex-1 min-w-0 font-mono text-zinc-400 truncate">${escapeHtml(a.category)} <span class="text-zinc-600">·</span> ${escapeHtml(a.technique)}</span>
           <span class="w-20 shrink-0 ${SEV_COLOR[a.severity]||SEV_COLOR.info} text-xs font-medium uppercase tracking-wide">${a.severity}</span>
-          <span class="w-10 shrink-0 font-mono text-zinc-500 text-xs text-right">${a.confidence.toFixed(2)}</span>
+          <span class="w-10 shrink-0 font-mono text-zinc-500 text-xs text-right">${(a.confidence||0).toFixed(2)}</span>
         </div>
         <div class="detail hidden px-4 pb-3 pt-0 sm:pl-[52px]">
           <div class="border-l-2 ${a.succeeded?'border-red-500/40':'border-emerald-500/40'} pl-3 font-mono text-[12.5px] leading-relaxed space-y-1.5">
-            <p class="text-zinc-400"><span class="text-zinc-600 select-none">payload   </span>${escapeHtml(a.prompt)}</p>
-            <p class="${a.succeeded?'text-red-300':'text-zinc-400'}"><span class="text-zinc-600 select-none">response  </span>${escapeHtml(a.response)}</p>
+            <p class="text-zinc-400"><span class="text-zinc-600 select-none">payload   </span>${escapeHtml(a.prompt||"")}</p>
+            <p class="${a.succeeded?'text-red-300':'text-zinc-400'}"><span class="text-zinc-600 select-none">response  </span>${escapeHtml(a.response||"")}</p>
+            ${a.reason ? `<p class="text-zinc-500"><span class="text-zinc-600 select-none">reason    </span>${escapeHtml(a.reason)}</p>` : ""}
           </div>
         </div>`;
 
@@ -228,25 +244,35 @@
 
       $("feed").prepend(row);
       if (activeFilter !== "all" && activeFilter !== row.dataset.verdict) row.classList.add("hidden");
-      $("feed").scrollTop = 0;
     }
 
-    function renderReport() {
-      const rate = state.fired ? Math.round((state.vulns/state.fired)*100) : 0;
+    function renderReport(report) {
+      const rate = report ? report.risk_score : (state.fired ? Math.round((state.vulns/state.fired)*100) : 0);
       const grade = rate>=50?"F":rate>=30?"D":rate>=15?"C":rate>0?"B":"A";
       const gradeColor = rate>=30?"text-red-400":rate>0?"text-amber-400":"text-emerald-400";
-      const bySev = {};
-      state.results.filter(r=>r.succeeded).forEach(r=>bySev[r.severity]=(bySev[r.severity]||0)+1);
-      const order = ["critical","high","medium","low","info"];
-      const maxN = Math.max(1, ...Object.values(bySev));
-      const sevLines = order.filter(s=>bySev[s]).map(s=>`
+
+      // by-category bars (from real report or built from state)
+      const byCat = report?.by_category || {};
+      if (!report) {
+        state.results.forEach(r => {
+          if (!byCat[r.category]) byCat[r.category] = {succeeded:0, total:0};
+          byCat[r.category].total++;
+          if (r.succeeded) byCat[r.category].succeeded++;
+        });
+      }
+      const maxCat = Math.max(1, ...Object.values(byCat).map(c=>c.total));
+      const catLines = Object.entries(byCat).map(([cat, s])=>`
         <div class="flex items-center gap-3 text-[13px]">
-          <span class="w-14 capitalize text-zinc-400">${s}</span>
+          <span class="w-28 capitalize text-zinc-400 truncate">${cat}</span>
           <div class="flex-1 h-1.5 bg-[#1c2129] overflow-hidden rounded-sm">
-            <div class="h-full ${SEV_BAR[s]}" style="width:${(bySev[s]/maxN)*100}%"></div>
+            <div class="h-full bg-red-500" style="width:${(s.succeeded/s.total)*100}%"></div>
           </div>
-          <span class="w-5 text-right font-mono tnum text-zinc-300">${bySev[s]}</span>
+          <span class="font-mono tnum text-zinc-400 text-xs">${s.succeeded}/${s.total}</span>
         </div>`).join("") || `<p class="text-[13px] text-emerald-400">No vulnerabilities identified.</p>`;
+
+      const total = report?.total_attacks ?? state.fired;
+      const succeeded = report?.succeeded ?? state.vulns;
+      const model = report?.target?.model ?? $("cfgModel").value;
 
       $("reportBody").innerHTML = `
         <div class="flex items-start gap-5 mb-5">
@@ -254,14 +280,14 @@
             <span class="text-5xl font-bold ${gradeColor}">${grade}</span>
           </div>
           <div class="text-[13px] text-zinc-400 space-y-1 pt-1">
-            <p class="text-zinc-100 text-[15px] font-medium">${state.vulns} of ${state.fired} attacks succeeded — ${rate}% failure rate</p>
+            <p class="text-zinc-100 text-[15px] font-medium">${succeeded} of ${total} attacks succeeded — ${rate}% risk score</p>
             <p>Target classified as <span class="${gradeColor} font-medium">${rate>=50?'critically':rate>=30?'highly':rate>0?'partially':'not'} vulnerable</span> to prompt injection.</p>
-            <p class="text-zinc-500 text-xs pt-0.5">${state.fired} payloads · ${new Set(state.results.map(r=>r.category)).size} attack categories · ${$("cfgModel").value}</p>
+            <p class="text-zinc-500 text-xs pt-0.5">${total} payloads · ${Object.keys(byCat).length} attack categories · ${model}</p>
           </div>
         </div>
         <div class="border-t hairline pt-4">
-          <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-3">Successful Attacks by Severity</p>
-          <div class="space-y-2 max-w-md">${sevLines}</div>
+          <p class="text-[11px] uppercase tracking-wide text-zinc-500 mb-3">Results by Category</p>
+          <div class="space-y-2 max-w-md">${catLines}</div>
         </div>`;
       $("report").classList.remove("hidden");
     }
@@ -272,32 +298,46 @@
       $("liveDot").className = "h-1.5 w-1.5 rounded-full " + color.replace("text-","bg-") + (pulse?" blink":"");
     }
 
-    function startScan() {
-      Object.assign(state,{fired:0,total:0,vulns:0,blocked:0,results:[]});
+    async function startScan() {
+      Object.assign(state,{fired:0,total:0,vulns:0,blocked:0,results:[],scanId:null});
       $("feed").innerHTML=""; $("report").classList.add("hidden");
       $("empty").classList.remove("hidden");
       $("scanBtn").disabled=true;
       setStatus("running","text-steel-400",true);
       renderStats();
 
-      const es = new EventSource("/events");
+      // Start scan → get scan_id
+      const res = await fetch("/api/start", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          provider: $("cfgProvider").value,
+          model: $("cfgModel").value,
+          system_prompt: $("cfgSystemPrompt").value,
+        })
+      });
+      const data = await res.json();
+      state.scanId = data.scan_id;
+      state.total = data.attack_count || 0;
+      renderStats();
+
+      // Stream results
+      const es = new EventSource(`/api/stream/${state.scanId}`);
       es.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        if (msg.type==="attack") {
-          const a = msg.data;
-          state.fired=a.index; state.total=a.total;
-          a.succeeded?state.vulns++:state.blocked++;
-          state.results.push(a); addRow(a); renderStats();
-        } else if (msg.type==="done") {
+        const a = JSON.parse(e.data);
+        if (a.event === "done") {
           es.close(); $("scanBtn").disabled=false;
           setStatus("complete","text-emerald-400",false);
-          renderReport();
+          // Fetch final report
+          fetch(`/api/report/${state.scanId}`)
+            .then(r=>r.json())
+            .then(report => renderReport(report))
+            .catch(() => renderReport(null));
+        } else {
+          state.fired++; a.succeeded?state.vulns++:state.blocked++;
+          state.results.push(a); addRow(a); renderStats();
         }
       };
       es.onerror = () => { es.close(); $("scanBtn").disabled=false; setStatus("error","text-red-400",false); };
-      fetch("/scan",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({
-        base_url: $("cfgUrl").value, model: $("cfgModel").value, api_key: $("cfgKey").value,
-      })});
     }
 
     function exportReport() {
@@ -305,18 +345,19 @@
       const grade = rate>=50?"F":rate>=30?"D":rate>=15?"C":rate>0?"B":"A";
       const lines = [
         "# PromptForge — Assessment Report","",
-        `Target:        ${$("cfgModel").value} (${$("cfgUrl").value})`,
-        `Generated:     ${new Date().toISOString()}`,
-        `Grade:         ${grade}`,
-        `Attacks run:   ${state.fired}`,
-        `Succeeded:     ${state.vulns} (${rate}% failure rate)`,
-        `Blocked:       ${state.blocked}`,
+        `Target:      ${$("cfgModel").value} (${$("cfgProvider").value})`,
+        `Generated:   ${new Date().toISOString()}`,
+        `Grade:       ${grade}  (${rate}% risk score)`,
+        `Attacks run: ${state.fired}`,
+        `Succeeded:   ${state.vulns}`,
+        `Blocked:     ${state.blocked}`,
         "","## Successful Attacks","",
       ];
       state.results.filter(r=>r.succeeded).forEach(r=>{
-        lines.push(`- [${r.severity.toUpperCase()}] ${r.attack_id} · ${r.category} / ${r.technique} (conf ${r.confidence})`);
+        lines.push(`- [${r.severity?.toUpperCase()}] ${r.attack_id} · ${r.category} / ${r.technique} (conf ${r.confidence})`);
         lines.push(`    payload  > ${r.prompt}`);
         lines.push(`    response < ${r.response}`);
+        if (r.reason) lines.push(`    reason   : ${r.reason}`);
       });
       const blob = new Blob([lines.join("\n")], { type:"text/markdown" });
       const url = URL.createObjectURL(blob);
