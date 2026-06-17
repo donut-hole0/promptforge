@@ -69,6 +69,28 @@ export LLM_API_KEY=your_key_here
 - [ ] Report export (PDF/JSON)
 - [ ] Rehearsed live demo
 
+## Importing JailbreakBench prompts
+
+PromptForge can import public JailbreakBench artifacts into the local attack
+library format. This keeps the backend on the same `attacks` schema while
+letting the team refresh research-backed jailbreak payloads during the
+hackathon.
+
+```bash
+pip install -r engine/requirements.txt
+python attacks/import_jbb.py --jbb-artifact --method PAIR --model-name vicuna-13b-v1.5
+```
+
+That writes `attacks/jbb_payloads.json`. The engine loads both
+`attacks/payloads.json` and `attacks/jbb_payloads.json` automatically when the
+generated file exists.
+
+To import a downloaded Hugging Face CSV/JSON export instead:
+
+```bash
+python attacks/import_jbb.py --input-file path/to/JBB-Behaviors.csv --prompt-field prompt
+```
+
 ## Disclaimer
 
 For educational and authorized security testing only. Only test endpoints you own or have explicit permission to test.

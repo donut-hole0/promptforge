@@ -1,0 +1,2 @@
+jailbreakbench==1.0.0
+litellm==1.20.0
