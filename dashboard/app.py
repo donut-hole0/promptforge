@@ -1,58 +1,59 @@
 """
 PromptForge - Dashboard (P3)
 ============================
-FastAPI server that serves the real-time dashboard UI.
+FastAPI server that serves the real-time dashboard UI and bridges it to the
+real engine.
 
-Talks to the real engine (server.py on port 8000) when available,
-falls back to a mock generator for offline development.
+It proxies the dashboard's API calls to the engine (server.py, default
+http://127.0.0.1:8000). When the engine isn't running it falls back to a
+local mock generator so the UI still works offline for development/demo.
 
-Endpoints:
+Endpoints (mirror server.py so the UI speaks one API):
   GET  /                       -> dashboard UI
-  POST /api/start              -> proxied to server.py (or mock)
-  GET  /api/stream/{scan_id}   -> proxied to server.py (or mock)
-  GET  /api/report/{scan_id}   -> proxied to server.py (or mock)
-  GET  /api/health             -> check if server.py is reachable
+  GET  /api/health             -> is the engine reachable? (live vs mock)
+  POST /api/start              -> start a scan        (proxied, or mock)
+  GET  /api/stream/{scan_id}   -> SSE result stream   (proxied, or mock)
+  GET  /api/report/{scan_id}   -> final report JSON   (proxied, or mock)
 
-Run (dashboard only, mock mode):
-  pip install fastapi uvicorn httpx
-  uvicorn dashboard.app:app --reload --port 8050
+Run (full stack — real scans):
+  python -m uvicorn server:app --port 8000           # terminal 1 (engine)
+  python -m uvicorn dashboard.app:app --port 8050    # terminal 2 (this UI)
 
-Run (full stack):
-  python server.py                         # terminal 1 (port 8000)
-  uvicorn dashboard.app:app --port 8050    # terminal 2
+Run (dashboard only, mock mode): just start this server; the engine being
+offline triggers the mock fallback automatically.
 """
 
 from __future__ import annotations
 
-# Verify TLS against the OS trust store (corporate/AV proxies intercept HTTPS
-# with a root CA that lives in the Windows store but not certifi). Must run
-# before openai/google clients open a connection.
-import truststore
-truststore.inject_into_ssl()
-
 import asyncio
 import json
+import os
 import random
-from dataclasses import asdict, dataclass
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+import httpx
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
-
-from engine.runner import Runner, TargetConfig
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
-PAYLOADS = ROOT.parent / "attacks" / "payloads.json"
+ENGINE_URL = os.getenv("ENGINE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 app = FastAPI(title="PromptForge Dashboard")
 
+# Mock-fallback state, keyed by scan_id (only used when the engine is offline).
+_mock_queues: dict[str, asyncio.Queue] = {}
+_mock_results: dict[str, list[dict]] = {}
+_mock_complete: dict[str, bool] = {}
+
 
 # ---------------------------------------------------------------------------
-# Attack library (mock fallback only)
+# Attack library (mock fallback only — the real engine loads its own)
 # ---------------------------------------------------------------------------
 
 def load_attacks() -> list[dict]:
+    """Prefer the engine's merged loader; fall back to the starter payloads."""
     try:
         import sys
         sys.path.insert(0, str(ROOT.parent))
@@ -69,7 +70,7 @@ def load_attacks() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Health check
+# Engine health
 # ---------------------------------------------------------------------------
 
 async def engine_is_up() -> bool:
@@ -82,23 +83,9 @@ async def engine_is_up() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Mock scan: simulates the engine firing attacks so the UI can be built and
-# demoed before P2 is wired up. Replace `run_mock_scan` with a real loop that
-# consumes engine.Runner.run_suite() results.
+# Mock scan: simulates engine output so the UI works without server.py.
+# Emits AttackResult-shaped dicts matching server.py's schema.
 # ---------------------------------------------------------------------------
-
-@dataclass
-class MockResult:
-    attack_id: str
-    category: str
-    technique: str
-    severity: str
-    prompt: str
-    response: str
-    succeeded: bool
-    confidence: float
-    reason: str = ""
-
 
 MOCK_RESPONSES = {
     True: [
@@ -115,142 +102,43 @@ MOCK_RESPONSES = {
 }
 
 
-async def run_mock_scan() -> None:
-    attacks = load_attacks()
-    total = len(attacks)
-    for i, attack in enumerate(attacks, start=1):
-        # Simulate target latency. Faster per-attack when the library is large
-        # so a full 88-attack demo stays snappy.
-        await asyncio.sleep(random.uniform(0.12, 0.3) if total > 20 else random.uniform(0.4, 1.1))
-        # Weak demo target: ~60% of attacks succeed.
-        succeeded = random.random() < 0.6
-        event = AttackEvent(
-            attack_id=attack["id"],
-            category=attack.get("category", "unknown"),
-            technique=attack.get("technique", ""),
-            severity=attack.get("severity", "info"),
-            prompt=attack["prompt"],
-            response=random.choice(MOCK_RESPONSES[succeeded]),
-            succeeded=succeeded,
-            confidence=round(random.uniform(0.7, 0.99), 2),
-            index=i,
-            total=total,
-        )
-        await _event_queue.put({"type": "attack", "data": asdict(event)})
-    await _event_queue.put({"type": "done", "data": {}})
-
-
-@app.post("/scan")
-async def start_scan(request: Request) -> dict:
-    # Target config from the UI (base_url / model / api_key). Stored for when
-    # P2's Runner is wired in; the mock scan ignores it.
-    try:
-        cfg = await request.json()
-    except Exception:
-        cfg = {}
-    app.state.target = cfg
-
-    # Drain any stale events, then start a fresh scan in the background.
-    while not _event_queue.empty():
-        _event_queue.get_nowait()
-    asyncio.create_task(run_mock_scan())
-    return {"status": "started", "total": len(load_attacks()), "target": cfg.get("model", "demo-target")}
-
-
-@app.get("/events")
-async def events() -> StreamingResponse:
-    async def stream():
-        while True:
-            event = await _event_queue.get()
-            yield f"data: {json.dumps(event)}\n\n"
-            if event["type"] == "done":
-                break
-
-    return StreamingResponse(stream(), media_type="text/event-stream")
-
-
-@app.get("/")
-async def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
-
-
-@app.get("/api/health")
-async def health():
-    up = await engine_is_up()
-    return {"engine": "up" if up else "offline", "mode": "live" if up else "mock"}
-
-
-@app.post("/api/start")
-async def start_scan(request: Request):
-    body = await request.body()
-
-    if await engine_is_up():
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.post(
-                f"{ENGINE_URL}/api/start",
-                content=body,
-                headers={"Content-Type": "application/json"},
-            )
-            return r.json()
-
-    payload = json.loads(body) if body else {}
-    attacks = load_attacks()
-    scan_id = str(uuid.uuid4())
-    _mock_queues[scan_id] = asyncio.Queue()
-    _mock_results[scan_id] = []
-    _mock_complete[scan_id] = False
-    asyncio.create_task(_run_mock_scan(scan_id, attacks))
-    return {"scan_id": scan_id, "attack_count": len(attacks), "mode": "mock", "target": payload.get("model", "demo")}
-
-
-@app.get("/api/stream/{scan_id}")
-async def stream_results(scan_id: str):
-    if await engine_is_up():
-        async def proxy_stream():
-            async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("GET", f"{ENGINE_URL}/api/stream/{scan_id}") as r:
-                    async for chunk in r.aiter_text():
-                        yield chunk
-        return StreamingResponse(proxy_stream(), media_type="text/event-stream",
-                                 headers={"Cache-Control": "no-cache"})
-
-    if scan_id not in _mock_queues:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Scan not found")
-
+async def _run_mock_scan(scan_id: str, attacks: list[dict]) -> None:
     queue = _mock_queues[scan_id]
+    total = len(attacks)
+    try:
+        for attack in attacks:
+            # Faster per-attack for a large library so a full demo stays snappy.
+            await asyncio.sleep(random.uniform(0.12, 0.3) if total > 20 else random.uniform(0.4, 1.0))
+            succeeded = random.random() < 0.5
+            result = {
+                "attack_id": attack["id"],
+                "category": attack.get("category", "unknown"),
+                "technique": attack.get("technique", ""),
+                "prompt": attack["prompt"],
+                "response": random.choice(MOCK_RESPONSES[succeeded]),
+                "succeeded": succeeded,
+                "confidence": round(random.uniform(0.7, 0.99), 2),
+                "severity": attack.get("severity", "info"),
+                "reason": "mock result (engine offline)",
+            }
+            _mock_results[scan_id].append(result)
+            await queue.put(result)
+    finally:
+        _mock_complete[scan_id] = True
+        await queue.put(None)  # sentinel — closes the SSE stream
 
-    async def mock_stream():
-        while True:
-            result = await queue.get()
-            if result is None:
-                yield 'data: {"event": "done"}\n\n'
-                break
-            yield f"data: {json.dumps(result)}\n\n"
 
-    return StreamingResponse(mock_stream(), media_type="text/event-stream",
-                             headers={"Cache-Control": "no-cache"})
-
-
-@app.get("/api/report/{scan_id}")
-async def get_report(scan_id: str):
-    if await engine_is_up():
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            r = await client.get(f"{ENGINE_URL}/api/report/{scan_id}")
-            return r.json()
-
+def _mock_report(scan_id: str) -> dict:
     results = _mock_results.get(scan_id, [])
     total = len(results)
     succeeded = sum(1 for r in results if r["succeeded"])
-    by_category: dict = {}
+    by_category: dict[str, dict] = {}
     for r in results:
         cat = r["category"]
-        if cat not in by_category:
-            by_category[cat] = {"succeeded": 0, "total": 0}
+        by_category.setdefault(cat, {"succeeded": 0, "total": 0})
         by_category[cat]["total"] += 1
         if r["succeeded"]:
             by_category[cat]["succeeded"] += 1
-
     return {
         "scan_id": scan_id,
         "target": {"provider": "mock", "model": "demo-target"},
@@ -261,3 +149,89 @@ async def get_report(scan_id: str):
         "by_category": by_category,
         "results": results,
     }
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/")
+async def index() -> FileResponse:
+    return FileResponse(STATIC / "index.html")
+
+
+@app.get("/api/health")
+async def health() -> dict:
+    up = await engine_is_up()
+    return {"engine": "up" if up else "offline", "mode": "live" if up else "mock"}
+
+
+@app.post("/api/start")
+async def start_scan(request: Request) -> dict:
+    body = await request.body()
+
+    # Live: forward to the real engine.
+    if await engine_is_up():
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.post(
+                f"{ENGINE_URL}/api/start",
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            return r.json()
+
+    # Offline: run a local mock scan.
+    attacks = load_attacks()
+    scan_id = str(uuid.uuid4())
+    _mock_queues[scan_id] = asyncio.Queue()
+    _mock_results[scan_id] = []
+    _mock_complete[scan_id] = False
+    asyncio.create_task(_run_mock_scan(scan_id, attacks))
+    return {"scan_id": scan_id, "attack_count": len(attacks)}
+
+
+@app.get("/api/stream/{scan_id}")
+async def stream_results(scan_id: str) -> StreamingResponse:
+    # Live: proxy the engine's SSE stream straight through.
+    if await engine_is_up():
+        async def proxy_stream():
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("GET", f"{ENGINE_URL}/api/stream/{scan_id}") as r:
+                    async for chunk in r.aiter_raw():
+                        yield chunk
+        return StreamingResponse(
+            proxy_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    # Offline: stream from the mock queue.
+    if scan_id not in _mock_queues:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    queue = _mock_queues[scan_id]
+
+    async def mock_stream():
+        while True:
+            result = await queue.get()
+            if result is None:
+                yield 'data: {"event": "done"}\n\n'
+                break
+            yield f"data: {json.dumps(result)}\n\n"
+
+    return StreamingResponse(
+        mock_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/api/report/{scan_id}")
+async def get_report(scan_id: str):
+    if await engine_is_up():
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{ENGINE_URL}/api/report/{scan_id}")
+            return r.json()
+
+    if scan_id not in _mock_results:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return _mock_report(scan_id)

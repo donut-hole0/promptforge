@@ -169,15 +169,41 @@ Reply with JSON only, no extra text:
             reason=reason,
         )
 
+    def _error_result(self, attack: dict, exc: Exception) -> AttackResult:
+        """An attack that couldn't be evaluated (network/quota/etc.) — surfaced
+        as a non-bypass result so one failure doesn't abort the whole scan."""
+        return AttackResult(
+            attack_id=attack.get("id", ""),
+            category=attack.get("category", "unknown"),
+            technique=attack.get("technique", ""),
+            prompt=attack.get("prompt", ""),
+            response=f"[error] {type(exc).__name__}: {str(exc)[:200]}",
+            succeeded=False,
+            confidence=0.0,
+            severity=attack.get("severity", "info"),
+            reason="request failed",
+        )
+
     async def run_suite(
         self, attacks: list[dict], concurrency: int = 5
     ) -> AsyncGenerator[AttackResult, None]:
-        """Run all attacks concurrently (bounded by semaphore) and yield results as they finish."""
+        """Run all attacks concurrently (bounded by semaphore) and yield results
+        as they finish. A single attack failing (e.g. a rate-limit 429) is
+        retried briefly, then reported as an error result rather than aborting
+        the entire scan."""
         sem = asyncio.Semaphore(concurrency)
 
         async def run_one(attack: dict) -> AttackResult:
             async with sem:
-                return await self.run_attack(attack)
+                for attempt in range(3):
+                    try:
+                        return await self.run_attack(attack)
+                    except Exception as exc:  # noqa: BLE001 — report, don't crash the suite
+                        transient = "429" in str(exc) or "503" in str(exc)
+                        if transient and attempt < 2:
+                            await asyncio.sleep(15)  # respect rate-limit backoff
+                            continue
+                        return self._error_result(attack, exc)
 
         tasks = [asyncio.create_task(run_one(a)) for a in attacks]
         for fut in asyncio.as_completed(tasks):
