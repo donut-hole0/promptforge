@@ -10,8 +10,12 @@ This is a scaffold. Fill in the TODOs during the hackathon.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 import os
+
+try:
+    from .attack_loader import load_attacks
+except ImportError:
+    from attack_loader import load_attacks
 
 
 @dataclass
@@ -36,6 +40,7 @@ class TargetConfig:
 class Runner:
     def __init__(self, target: TargetConfig):
         self.target = target
+        self.attacks = load_attacks()
 
     async def send(self, prompt: str) -> str:
         """Send a single prompt to the target endpoint and return its reply."""
@@ -65,3 +70,7 @@ class Runner:
         for attack in attacks:
             results.append(await self.run_attack(attack))
         return results
+
+    async def run_default_suite(self) -> list[AttackResult]:
+        """Run the configured PromptForge attack library."""
+        return await self.run_suite(self.attacks)
