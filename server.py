@@ -17,16 +17,12 @@ import uuid
 from collections import defaultdict
 from dataclasses import asdict
 
-import ssl
-import certifi
-
-# Patch ssl.create_default_context so httpx (used by google-genai) trusts certifi's CA bundle.
-# Required on Windows where Python 3.14 doesn't automatically load system root certs.
-_orig_create_default_context = ssl.create_default_context
-def _patched_create_default_context(purpose=ssl.Purpose.SERVER_AUTH, *args, **kwargs):
-    kwargs.setdefault("cafile", certifi.where())
-    return _orig_create_default_context(purpose, *args, **kwargs)
-ssl.create_default_context = _patched_create_default_context
+# Use the OS (Windows) trust store for TLS verification. Required when outbound
+# HTTPS is intercepted by a corporate/AV proxy whose root CA lives in the Windows
+# certificate store but not in certifi's bundle — the case on this machine.
+# Must run before any library (httpx/google-genai/openai/anthropic) opens a connection.
+import truststore
+truststore.inject_into_ssl()
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -38,7 +34,6 @@ from attacks.load import load_attacks
 from engine.runner import AttackResult, Runner, TargetConfig
 
 load_dotenv()
-os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 app = FastAPI(title="PromptForge API")
 
