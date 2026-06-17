@@ -18,34 +18,41 @@ Run (dashboard only, mock mode):
   uvicorn dashboard.app:app --reload --port 8050
 
 Run (full stack):
-  python server.py                         # terminal 1 (port 8000)
-  uvicorn dashboard.app:app --port 8050    # terminal 2
+  .\.venv\Scripts\python.exe -m uvicorn server:app --reload --port 8000
+  .\.venv\Scripts\python.exe -m uvicorn dashboard.app:app --reload --port 8050
 """
 
 from __future__ import annotations
 
-# Verify TLS against the OS trust store (corporate/AV proxies intercept HTTPS
-# with a root CA that lives in the Windows store but not certifi). Must run
-# before openai/google clients open a connection.
-import truststore
-truststore.inject_into_ssl()
+# Verify TLS against the OS trust store when truststore is installed. This is
+# helpful on some Windows machines, but the dashboard can run without it.
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
 
 import asyncio
 import json
 import random
+import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, StreamingResponse
-
-from engine.runner import Runner, TargetConfig
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
 PAYLOADS = ROOT.parent / "attacks" / "payloads.json"
+ENGINE_URL = "http://127.0.0.1:8000"
 
 app = FastAPI(title="PromptForge Dashboard")
+_event_queue: asyncio.Queue = asyncio.Queue()
+_mock_queues: dict[str, asyncio.Queue] = {}
+_mock_results: dict[str, list[dict]] = {}
+_mock_complete: dict[str, bool] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +107,12 @@ class MockResult:
     reason: str = ""
 
 
+@dataclass
+class AttackEvent(MockResult):
+    index: int = 0
+    total: int = 0
+
+
 MOCK_RESPONSES = {
     True: [
         "PWNED",
@@ -138,6 +151,33 @@ async def run_mock_scan() -> None:
         )
         await _event_queue.put({"type": "attack", "data": asdict(event)})
     await _event_queue.put({"type": "done", "data": {}})
+
+
+async def _run_mock_scan(scan_id: str, attacks: list[dict]) -> None:
+    queue = _mock_queues[scan_id]
+    total = len(attacks)
+    try:
+        for i, attack in enumerate(attacks, start=1):
+            await asyncio.sleep(random.uniform(0.12, 0.3) if total > 20 else random.uniform(0.4, 1.1))
+            succeeded = random.random() < 0.6
+            event = AttackEvent(
+                attack_id=attack["id"],
+                category=attack.get("category", "unknown"),
+                technique=attack.get("technique", ""),
+                severity=attack.get("severity", "info"),
+                prompt=attack["prompt"],
+                response=random.choice(MOCK_RESPONSES[succeeded]),
+                succeeded=succeeded,
+                confidence=round(random.uniform(0.7, 0.99), 2),
+                index=i,
+                total=total,
+            )
+            payload = asdict(event)
+            _mock_results[scan_id].append(payload)
+            await queue.put(payload)
+    finally:
+        _mock_complete[scan_id] = True
+        await queue.put(None)
 
 
 @app.post("/scan")

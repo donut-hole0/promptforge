@@ -18,7 +18,7 @@ if not exist .env (
 
 REM Start backend in a new window
 echo [*] Starting backend server (http://localhost:8000)...
-start "PromptForge Backend" cmd /k "python server.py"
+start "PromptForge Backend" cmd /k ".\.venv\Scripts\python.exe -m uvicorn server:app --reload --port 8000"
 
 REM Wait a moment for backend to start
 timeout /t 2 /nobreak
