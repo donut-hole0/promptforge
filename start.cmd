@@ -16,29 +16,24 @@ if not exist .env (
     pause
 )
 
-REM Start backend in a new window
-echo [*] Starting backend server (http://localhost:8000)...
-start "PromptForge Backend" cmd /k "python server.py"
+REM Start engine in a new window (http://localhost:8000)
+echo [*] Starting engine (http://localhost:8000)...
+start "PromptForge Engine" cmd /k "python server.py"
 
-REM Wait a moment for backend to start
-timeout /t 2 /nobreak
+REM Wait a moment for the engine to start
+timeout /t 2 /nobreak >nul
 
-REM Start frontend in a new window
-echo [*] Starting dashboard (http://localhost:3000)...
-cd dashboard
-echo [*] Installing dependencies...
-call npm install
-echo [*] Starting dev server...
-start "PromptForge Dashboard" cmd /k "npm run dev"
-cd ..
+REM Start dashboard in a new window (http://localhost:8050)
+echo [*] Starting dashboard (http://localhost:8050)...
+start "PromptForge Dashboard" cmd /k "python -m uvicorn dashboard.app:app --port 8050"
 
 echo.
 echo ========================================
 echo [+] PromptForge is running!
 echo.
-echo Backend:  http://localhost:8000
-echo Dashboard: http://localhost:3000
-echo API Docs: http://localhost:8000/docs
+echo Engine:    http://localhost:8000
+echo Dashboard: http://localhost:8050
+echo API Docs:  http://localhost:8000/docs
 echo.
 echo [*] Close the windows when you're done
 echo ========================================

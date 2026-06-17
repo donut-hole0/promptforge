@@ -38,7 +38,7 @@ docs/         # pitch deck, demo script, methodology notes
 
 - **Engine:** Python 3.11 + FastAPI (async attack execution, REST API)
 - **Scoring:** LLM-as-judge via API + regex/heuristic checks
-- **Dashboard:** React + Vite, live updates over WebSocket/SSE
+- **Dashboard:** FastAPI serving a single-file HTML/JS UI, live updates over SSE
 - **Demo target:** small FastAPI chatbot with an intentionally weak system prompt
 
 ## Getting started
