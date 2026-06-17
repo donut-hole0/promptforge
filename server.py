@@ -21,8 +21,11 @@ from dataclasses import asdict
 # HTTPS is intercepted by a corporate/AV proxy whose root CA lives in the Windows
 # certificate store but not in certifi's bundle — the case on this machine.
 # Must run before any library (httpx/google-genai/openai/anthropic) opens a connection.
-import truststore
-truststore.inject_into_ssl()
+try:
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass  # Windows-only; safe to skip on Mac/Linux
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
