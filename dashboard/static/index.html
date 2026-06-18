@@ -234,7 +234,7 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-12">
         <!-- Provider -->
-        <label class="sm:col-span-4 px-4 py-3.5 border-b sm:border-b-0 sm:border-r hairline block group">
+        <label class="sm:col-span-3 px-4 py-3.5 border-b sm:border-b-0 sm:border-r hairline block group">
           <span class="eyebrow text-subtle block mb-2 group-focus-within:text-primary transition">Provider</span>
           <select id="cfgProvider" class="focusable w-full bg-transparent font-mono text-[13px] text-foreground rounded cursor-pointer">
             <option value="ollama">Ollama · local</option>
@@ -258,8 +258,14 @@
             <option value="gemini-1.5-flash"></option>
           </datalist>
         </label>
+        <!-- Attack limit -->
+        <label class="sm:col-span-2 px-4 py-3.5 border-b sm:border-b-0 sm:border-r hairline block group">
+          <span class="eyebrow text-subtle block mb-2 group-focus-within:text-primary transition">Attacks</span>
+          <input id="cfgCount" type="number" min="1" value="25" spellcheck="false"
+            class="focusable w-full bg-transparent font-mono text-[13px] text-foreground rounded" />
+        </label>
         <!-- API key (auto-loaded from .env; hidden for local Ollama) -->
-        <label id="apiKeyLabel" class="sm:col-span-4 px-4 py-3.5 border-b sm:border-b-0 hairline block group" style="display:none">
+        <label id="apiKeyLabel" class="sm:col-span-3 px-4 py-3.5 border-b sm:border-b-0 hairline block group" style="display:none">
           <span class="eyebrow text-subtle mb-2 flex items-center gap-1.5 group-focus-within:text-primary transition">
             API Key
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" class="opacity-60"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
@@ -644,11 +650,21 @@
       chip.style.borderColor = live ? "color-mix(in oklch,var(--success) 45%, var(--border))" : "var(--border)";
     }).catch(()=>{});
 
+    function lockControls(locked){
+      ["cfgProvider","cfgModel","cfgCount","cfgApiKey","cfgSystemPrompt"].forEach(id=>{
+        const el = $(id);
+        if (!el) return;
+        el.disabled = locked;
+        el.classList.toggle("opacity-40", locked);
+        el.classList.toggle("cursor-not-allowed", locked);
+      });
+    }
+
     async function startScan(){
       Object.assign(state,{fired:0,total:0,vulns:0,blocked:0,results:[],scanId:null});
       $("feed").innerHTML=""; $("report").classList.add("hidden"); $("empty").classList.remove("hidden");
       $("matrix").innerHTML = `<p class="text-subtle text-[12px] font-mono">Category breakdown populates as attacks land.</p>`;
-      $("scanBtn").disabled=true; $("scanBtnLabel").textContent="ENGAGING";
+      $("scanBtn").disabled=true; $("scanBtnLabel").textContent="ENGAGING"; lockControls(true);
       $("scanPing").classList.remove("hidden"); $("scanPing").classList.add("flex");
       document.body.classList.add("is-scanning");
       setStatus("ENGAGING","var(--primary)",true);
@@ -663,6 +679,7 @@
             model: $("cfgModel").value,
             system_prompt: $("cfgSystemPrompt").value,
             api_key: $("cfgApiKey").value || undefined,
+            count: parseInt($("cfgCount").value, 10) || 0,
           })});
         const data = await res.json();
         state.scanId = data.scan_id;
@@ -684,7 +701,7 @@
     function endScan(label,color){
       document.body.classList.remove("is-scanning");
       $("scanPing").classList.add("hidden"); $("scanPing").classList.remove("flex");
-      $("scanBtn").disabled=false; $("scanBtnLabel").textContent="ENGAGE";
+      $("scanBtn").disabled=false; $("scanBtnLabel").textContent="ENGAGE"; lockControls(false);
       setStatus(label,color,false);
     }
 

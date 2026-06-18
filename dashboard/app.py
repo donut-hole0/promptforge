@@ -202,6 +202,9 @@ async def start_scan(request: Request) -> dict:
 
     # Offline: run a local mock scan.
     attacks = load_attacks()
+    count = payload.get("count", 0)
+    if count and count > 0:
+        attacks = attacks[:count]
     scan_id = str(uuid.uuid4())
     _mock_queues[scan_id] = asyncio.Queue()
     _mock_results[scan_id] = []

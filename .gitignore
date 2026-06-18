@@ -4,3 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 dist/
+.claude/settings.local.json
+.idea/claudeCodeTabState.xml
+dashboard/static/landing.html
+dashboard/static/forge-mark.svg
