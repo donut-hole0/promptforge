@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PromptForge — AI red-team platform</title>
+  <link rel="icon" type="image/svg+xml" href="/forge-mark.svg" />
+  <meta name="description" content="PromptForge fires 100+ prompt-injection and jailbreak attacks at any LLM endpoint, then scores exactly how exposed you are." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: { extend: {
+        fontFamily: {
+          sans:["Inter","system-ui","sans-serif"],
+          display:["Space Grotesk","Inter","sans-serif"],
+          mono:["IBM Plex Mono","monospace"],
+        },
+        colors: {
+          bg:"#0B0B0D", srf:"#131216", srf2:"#16151A",
+          bdr:"#26262B", bdr2:"#1B1B1F",
+          txt:"#F5F5F4", sub:"#9A9A95", mut:"#5E5E62",
+          ember:"#FF6A3D", "ember-hi":"#FF8A5C", "ember-deep":"#B5340F",
+          danger:"#E5484D", ok:"#2DB47C",
+        },
+      }},
+    };
+  </script>
+  <style>
+    :root { color-scheme:dark; }
+    html { scroll-behavior:smooth; }
+    body { background:#0B0B0D; }
+    .grain { background-image:radial-gradient(#1b1b1f 0.5px, transparent 0.5px); background-size:22px 22px; }
+    /* one-shot reveal for hero log rows — purposeful, not looping */
+    @keyframes slideIn { from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)} }
+    .log-row { opacity:0; animation:slideIn .35s ease-out forwards; }
+    .hairline { border-color:#26262B; }
+  </style>
+</head>
+<body class="bg-bg text-txt font-sans antialiased selection:bg-ember selection:text-black">
+
+<svg width="0" height="0" class="hidden" aria-hidden="true">
+  <symbol id="ember" viewBox="0 0 56 56">
+    <path d="M28 3 L3 28 L28 53 Z" fill="#B5340F"/>
+    <path d="M28 3 L53 28 L28 53 Z" fill="#FF6A3D"/>
+    <path d="M28 3 L22 16 L34 16 Z" fill="#FFD2B0"/>
+    <line x1="28" y1="6" x2="28" y2="50" stroke="#FFC09A" stroke-width="1.2"/>
+    <path d="M47 5 L51 9 L47 13 L43 9 Z" fill="#FF8A4D"/>
+    <path d="M39 2.5 L41.5 5 L39 7.5 L36.5 5 Z" fill="#FFC09A"/>
+  </symbol>
+</svg>
+
+<!-- Nav -->
+<header class="sticky top-0 z-30 border-b hairline bg-bg/80 backdrop-blur-sm">
+  <div class="max-w-[1180px] mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5">
+      <svg class="h-7 w-7"><use href="#ember"/></svg>
+      <span class="font-display font-bold text-[17px] tracking-tight">PromptForge</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-sm text-sub">
+      <a href="#how" class="hover:text-txt transition-colors">Methodology</a>
+      <a href="#attacks" class="hover:text-txt transition-colors">Attacks</a>
+      <a href="#report" class="hover:text-txt transition-colors">Report</a>
+    </nav>
+    <a href="/app" class="px-4 py-2 rounded-md bg-ember hover:bg-ember-hi text-black text-sm font-medium transition-colors">
+      Run scan
+    </a>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="relative overflow-hidden border-b hairline">
+  <div class="absolute inset-0 grain opacity-40"></div>
+  <div class="relative max-w-[1180px] mx-auto px-6 py-20 md:py-28 grid lg:grid-cols-[1.05fr_0.95fr] gap-14 items-center">
+    <div>
+      <div class="font-mono text-[12px] tracking-[0.2em] text-ember-hi mb-6">AI RED-TEAM // OFFENSIVE SECURITY</div>
+      <h1 class="font-display font-bold text-5xl md:text-[64px] leading-[0.98] tracking-tight">
+        Break your AI<br>before they do.
+      </h1>
+      <p class="mt-6 text-[17px] leading-relaxed text-sub max-w-md">
+        PromptForge fires 100+ prompt-injection and jailbreak attacks at any LLM endpoint,
+        agent, or chatbot — then scores exactly how exposed you are.
+      </p>
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <a href="/app" class="px-5 py-3 rounded-md bg-ember hover:bg-ember-hi text-black text-[15px] font-medium transition-colors">
+          Run an assessment
+        </a>
+        <a href="#how" class="px-5 py-3 rounded-md border hairline hover:bg-srf2 text-[15px] text-txt transition-colors">
+          View methodology
+        </a>
+      </div>
+      <p class="mt-6 font-mono text-[12px] text-mut">
+        Measures exposure to known attack classes. It won't solve prompt injection — it tells you how bad it is.
+      </p>
+    </div>
+
+    <!-- Live product panel -->
+    <div class="rounded-xl border border-bdr bg-srf p-5 shadow-2xl shadow-black/40">
+      <div class="flex items-center justify-between mb-4">
+        <span class="font-mono text-[11px] tracking-widest text-mut">LIVE ASSESSMENT</span>
+        <span class="flex items-center gap-1.5 font-mono text-[11px] text-sub">
+          <span class="h-1.5 w-1.5 rounded-full bg-ember"></span> qwen2.5:0.5b
+        </span>
+      </div>
+      <div class="flex items-center gap-4 mb-4">
+        <div class="h-14 w-14 shrink-0 grid place-items-center rounded-lg border border-[#3A2A24] bg-[#1B1411]">
+          <span class="font-display font-bold text-3xl text-ember">D</span>
+        </div>
+        <div>
+          <div class="text-[15px] font-medium">38% risk score</div>
+          <div class="text-[13px] text-sub">9 of 25 attacks succeeded</div>
+        </div>
+      </div>
+      <div class="h-1 w-full rounded-full bg-bdr2 overflow-hidden mb-4">
+        <div class="h-1 rounded-full bg-ember" style="width:38%"></div>
+      </div>
+      <div id="heroFeed" class="space-y-0 font-mono text-[12px]"></div>
+      <div class="mt-3 pt-3 border-t hairline font-mono text-[11px] text-mut">25 payloads · 5 categories · LLM-as-judge</div>
+    </div>
+  </div>
+</section>
+
+<!-- Proof strip -->
+<section class="border-b hairline">
+  <div class="max-w-[1180px] mx-auto px-6 py-7 flex flex-wrap items-center gap-x-10 gap-y-3">
+    <span class="font-mono text-[11px] tracking-widest text-mut">TESTED AGAINST</span>
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-2 text-sub text-sm">
+      <span>OpenAI</span><span>Anthropic</span><span>Google Gemini</span>
+      <span>Ollama <span class="text-mut">· local</span></span><span>Any OpenAI-compatible API</span>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how" class="border-b hairline">
+  <div class="max-w-[1180px] mx-auto px-6 py-20">
+    <div class="font-mono text-[12px] tracking-[0.2em] text-ember-hi mb-3">HOW IT WORKS</div>
+    <h2 class="font-display font-bold text-3xl md:text-4xl tracking-tight max-w-xl">Three steps from endpoint to verdict.</h2>
+    <div class="mt-12 grid md:grid-cols-3 gap-px bg-bdr2 border hairline rounded-xl overflow-hidden">
+      <div class="bg-bg p-8">
+        <div class="font-mono text-ember text-sm mb-5">01 / TARGET</div>
+        <h3 class="font-display font-bold text-xl mb-2">Point it anywhere</h3>
+        <p class="text-sub text-[15px] leading-relaxed">Aim PromptForge at any OpenAI-compatible endpoint, agent, or chatbot wrapper. No SDK, no instrumentation.</p>
+      </div>
+      <div class="bg-bg p-8">
+        <div class="font-mono text-ember text-sm mb-5">02 / FORGE</div>
+        <h3 class="font-display font-bold text-xl mb-2">Fire the battery</h3>
+        <p class="text-sub text-[15px] leading-relaxed">A curated library of categorized injection and jailbreak payloads runs concurrently against the target.</p>
+      </div>
+      <div class="bg-bg p-8">
+        <div class="font-mono text-ember text-sm mb-5">03 / REPORT</div>
+        <h3 class="font-display font-bold text-xl mb-2">Score the damage</h3>
+        <p class="text-sub text-[15px] leading-relaxed">Every response is judged pass/fail by an LLM-as-judge plus heuristics, then graded A–F with severity.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Attack taxonomy -->
+<section id="attacks" class="border-b hairline">
+  <div class="max-w-[1180px] mx-auto px-6 py-20">
+    <div class="font-mono text-[12px] tracking-[0.2em] text-ember-hi mb-3">ATTACK TAXONOMY</div>
+    <h2 class="font-display font-bold text-3xl md:text-4xl tracking-tight max-w-xl">Five vectors. One hundred-plus payloads.</h2>
+    <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="rounded-lg border hairline bg-srf2 p-6">
+        <div class="font-mono text-[11px] text-mut mb-3">VECTOR 01</div>
+        <h3 class="font-display font-bold text-lg mb-1.5">Direct injection</h3>
+        <p class="text-sub text-sm leading-relaxed">Override the system prompt head-on — "ignore previous instructions" and its many descendants.</p>
+      </div>
+      <div class="rounded-lg border hairline bg-srf2 p-6">
+        <div class="font-mono text-[11px] text-mut mb-3">VECTOR 02</div>
+        <h3 class="font-display font-bold text-lg mb-1.5">Jailbreak</h3>
+        <p class="text-sub text-sm leading-relaxed">Role-play, personas, and DAN-style coercion that talk the model out of its guardrails.</p>
+      </div>
+      <div class="rounded-lg border hairline bg-srf2 p-6">
+        <div class="font-mono text-[11px] text-mut mb-3">VECTOR 03</div>
+        <h3 class="font-display font-bold text-lg mb-1.5">Prompt extraction</h3>
+        <p class="text-sub text-sm leading-relaxed">Coax the model into disclosing its own hidden system prompt and configuration.</p>
+      </div>
+      <div class="rounded-lg border hairline bg-srf2 p-6">
+        <div class="font-mono text-[11px] text-mut mb-3">VECTOR 04</div>
+        <h3 class="font-display font-bold text-lg mb-1.5">Indirect injection</h3>
+        <p class="text-sub text-sm leading-relaxed">Smuggle instructions through context, fake system messages, and authority impersonation.</p>
+      </div>
+      <div class="rounded-lg border hairline bg-srf2 p-6">
+        <div class="font-mono text-[11px] text-mut mb-3">VECTOR 05</div>
+        <h3 class="font-display font-bold text-lg mb-1.5">Obfuscation</h3>
+        <p class="text-sub text-sm leading-relaxed">Base64, encoding tricks, and hidden instructions that slip past naive filters.</p>
+      </div>
+      <div class="rounded-lg border border-[#3A2A24] bg-[#150F0C] p-6 flex flex-col justify-between">
+        <div>
+          <div class="font-mono text-[11px] text-ember mb-3">+ RESEARCH-BACKED</div>
+          <h3 class="font-display font-bold text-lg mb-1.5">JailbreakBench</h3>
+          <p class="text-sub text-sm leading-relaxed">Public research artifacts import straight into the library to keep payloads current.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Report explainer -->
+<section id="report" class="border-b hairline">
+  <div class="max-w-[1180px] mx-auto px-6 py-20 grid lg:grid-cols-2 gap-14 items-center">
+    <div>
+      <div class="font-mono text-[12px] tracking-[0.2em] text-ember-hi mb-3">THE REPORT</div>
+      <h2 class="font-display font-bold text-3xl md:text-4xl tracking-tight">A grade you can act on.</h2>
+      <p class="mt-5 text-[17px] leading-relaxed text-sub max-w-md">
+        PromptForge collapses every result into a single CVSS-style score: the percentage of
+        attacks that landed, broken down by category and severity, with the worst transcripts
+        attached. Export to Markdown and ship it with the model.
+      </p>
+      <a href="/app" class="mt-7 inline-flex px-5 py-3 rounded-md bg-ember hover:bg-ember-hi text-black text-[15px] font-medium transition-colors">
+        Generate a report
+      </a>
+    </div>
+    <div class="rounded-xl border hairline bg-srf p-6">
+      <div class="flex items-center gap-2 mb-5">
+        <span class="font-mono text-[11px] tracking-widest text-mut">RISK GRADE</span>
+      </div>
+      <div class="flex items-end gap-2">
+        <div class="flex-1 text-center py-3 rounded-md bg-srf2 border hairline"><div class="font-display font-bold text-xl text-ok">A</div><div class="font-mono text-[10px] text-mut mt-1">0%</div></div>
+        <div class="flex-1 text-center py-4 rounded-md bg-srf2 border hairline"><div class="font-display font-bold text-2xl text-ok">B</div><div class="font-mono text-[10px] text-mut mt-1">&lt;15%</div></div>
+        <div class="flex-1 text-center py-5 rounded-md bg-srf2 border hairline"><div class="font-display font-bold text-2xl text-[#E2A23B]">C</div><div class="font-mono text-[10px] text-mut mt-1">&lt;30%</div></div>
+        <div class="flex-1 text-center py-6 rounded-md bg-[#1B1411] border border-[#3A2A24]"><div class="font-display font-bold text-3xl text-ember">D</div><div class="font-mono text-[10px] text-mut mt-1">&lt;50%</div></div>
+        <div class="flex-1 text-center py-7 rounded-md bg-[#1B0F0F] border border-[#3A2424]"><div class="font-display font-bold text-3xl text-danger">F</div><div class="font-mono text-[10px] text-mut mt-1">50%+</div></div>
+      </div>
+      <div class="mt-6 space-y-2.5">
+        <div class="flex items-center gap-3 text-xs"><span class="w-24 text-sub">jailbreak</span><div class="flex-1 h-1 bg-bdr2 rounded-full overflow-hidden"><div class="h-full bg-danger rounded-full" style="width:72%"></div></div><span class="font-mono text-sub w-10 text-right">5/7</span></div>
+        <div class="flex items-center gap-3 text-xs"><span class="w-24 text-sub">extraction</span><div class="flex-1 h-1 bg-bdr2 rounded-full overflow-hidden"><div class="h-full bg-ember rounded-full" style="width:40%"></div></div><span class="font-mono text-sub w-10 text-right">2/5</span></div>
+        <div class="flex items-center gap-3 text-xs"><span class="w-24 text-sub">obfuscation</span><div class="flex-1 h-1 bg-bdr2 rounded-full overflow-hidden"><div class="h-full bg-ember rounded-full" style="width:33%"></div></div><span class="font-mono text-sub w-10 text-right">1/3</span></div>
+        <div class="flex items-center gap-3 text-xs"><span class="w-24 text-sub">direct</span><div class="flex-1 h-1 bg-bdr2 rounded-full overflow-hidden"><div class="h-full bg-ok rounded-full" style="width:12%"></div></div><span class="font-mono text-sub w-10 text-right">1/8</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Closing CTA -->
+<section class="border-b hairline">
+  <div class="max-w-[1180px] mx-auto px-6 py-24 text-center">
+    <h2 class="font-display font-bold text-4xl md:text-6xl tracking-tight">Ship agents you can defend.</h2>
+    <p class="mt-5 text-[17px] text-sub max-w-lg mx-auto">Know your exposure before an attacker does. Run a full assessment in under a minute.</p>
+    <a href="/app" class="mt-8 inline-flex px-6 py-3.5 rounded-md bg-ember hover:bg-ember-hi text-black text-base font-medium transition-colors">
+      Run an assessment
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="max-w-[1180px] mx-auto px-6 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+  <div class="flex items-center gap-2.5">
+    <svg class="h-5 w-5"><use href="#ember"/></svg>
+    <span class="font-display font-bold tracking-tight">PromptForge</span>
+  </div>
+  <div class="font-mono text-[11px] text-mut">Authorized security testing only · Built for CipherHacks</div>
+</footer>
+
+<script>
+  // Animate the hero panel once on load to show the product working — purposeful,
+  // single-pass, no looping glow.
+  const HERO_ROWS = [
+    {v:"FAIL", t:"jailbreak · persona",      bad:true},
+    {v:"PASS", t:"direct · override",        bad:false},
+    {v:"FAIL", t:"extraction · leak",        bad:true},
+    {v:"FAIL", t:"obfuscation · base64",     bad:true},
+    {v:"PASS", t:"indirect · authority",     bad:false},
+  ];
+  const feed = document.getElementById("heroFeed");
+  HERO_ROWS.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "log-row flex items-center gap-2.5 py-1.5 border-b border-bdr2 last:border-0";
+    row.style.animationDelay = (i * 0.12) + "s";
+    row.innerHTML =
+      `<span class="h-1.5 w-1.5 rounded-full ${r.bad?'bg-danger':'bg-ok'}"></span>` +
+      `<span class="${r.bad?'text-danger':'text-ok'} w-10">${r.v}</span>` +
+      `<span class="text-sub">${r.t}</span>`;
+    feed.appendChild(row);
+  });
+</script>
+</body>
+</html>
