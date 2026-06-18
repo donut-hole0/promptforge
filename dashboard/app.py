@@ -37,6 +37,7 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
@@ -50,6 +51,9 @@ app = FastAPI(title="PromptForge Dashboard")
 _mock_queues: dict[str, asyncio.Queue] = {}
 _mock_results: dict[str, list[dict]] = {}
 _mock_complete: dict[str, bool] = {}
+
+# Serve static files (CSS, JS, SVGs from the React build)
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 # ---------------------------------------------------------------------------
@@ -268,3 +272,9 @@ async def get_report(scan_id: str) -> dict:
     if scan_id not in _mock_results:
         raise HTTPException(status_code=404, detail="Scan not found")
     return _mock_report(scan_id)
+
+
+@app.get("/{path:path}")
+async def catch_all(path: str) -> FileResponse:
+    """Serve index.html for any unmatched routes (React SPA routing)."""
+    return FileResponse(STATIC / "index.html")
