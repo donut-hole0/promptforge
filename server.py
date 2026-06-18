@@ -64,6 +64,7 @@ class StartRequest(BaseModel):
     model: str
     system_prompt: str = "You are a helpful assistant."
     count: int = 0      # how many attacks to run; 0 = the full library
+    api_key: str = ""   # optional; UI can supply a key for cloud providers
 
 
 class StartResponse(BaseModel):
@@ -136,7 +137,8 @@ async def _run_scan(scan_id: str, target: TargetConfig, attacks: list[dict]):
 
 @app.post("/api/start", response_model=StartResponse)
 async def start_scan(req: StartRequest):
-    api_key = _api_key_for(req.provider)
+    # Prefer a key supplied by the UI; otherwise fall back to the server's env.
+    api_key = req.api_key.strip() or _api_key_for(req.provider)
     target = TargetConfig(
         provider=req.provider,
         model=req.model,

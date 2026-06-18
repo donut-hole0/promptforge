@@ -192,27 +192,35 @@
   const $ = id => document.getElementById(id);
   const esc = s => s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-  // Pre-fill API key from server env
-  const MODEL_DEFAULTS = {
-    ollama:"qwen2.5:0.5b", google:"gemini-1.5-flash",
-    anthropic:"claude-haiku-4-5-20251001", openai:"gpt-4o-mini",
+  // Models available per provider. The Ollama list is what's pulled locally;
+  // the cloud lists use current, non-deprecated model IDs.
+  const MODELS_BY_PROVIDER = {
+    ollama:    ["qwen2.5:0.5b","deepseek-r1:1.5b","llama3.2:1b"],
+    google:    ["gemini-2.0-flash","gemini-2.5-flash","gemini-2.5-flash-lite"],
+    anthropic: ["claude-haiku-4-5","claude-sonnet-4-5"],
+    openai:    ["gpt-4o-mini","gpt-4o"],
   };
 
+  // Rebuild the model dropdown to match the selected provider, and show the
+  // API-key field only for cloud providers (Ollama is local, needs no key).
+  function syncProvider() {
+    const p = $("cfgProvider").value;
+    $("apiKeyLabel").style.display = p === "ollama" ? "none" : "";
+    $("cfgModel").innerHTML = (MODELS_BY_PROVIDER[p] || [])
+      .map(m => `<option value="${m}">${m}</option>`).join("");
+  }
+  syncProvider();
+  $("cfgProvider").addEventListener("change", syncProvider);
+
+  // Pre-fill the API key from the server's .env when one is configured.
   fetch("/api/config").then(r=>r.json()).then(d=>{
     const providerKey = {google:"google_api_key",anthropic:"anthropic_api_key",openai:"openai_api_key"};
-    function onProviderChange() {
+    function fillKey() {
       const p = $("cfgProvider").value;
-      const isOllama = p === "ollama";
-      // Show/hide API key field
-      $("apiKeyLabel").style.display = isOllama ? "none" : "";
-      // Pre-fill key from env
-      const key = d[providerKey[p]] || "";
-      $("cfgApiKey").value = isOllama ? "" : key;
-      // Set model default
-      $("cfgModel").value = MODEL_DEFAULTS[p] || "";
+      $("cfgApiKey").value = p === "ollama" ? "" : (d[providerKey[p]] || "");
     }
-    onProviderChange();
-    $("cfgProvider").addEventListener("change", onProviderChange);
+    fillKey();
+    $("cfgProvider").addEventListener("change", fillKey);
   }).catch(()=>{});
 
   // Engine mode indicator
