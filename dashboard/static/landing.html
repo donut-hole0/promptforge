@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PromptForge — Break your AI before they do</title>
+  <link rel="icon" type="image/svg+xml" href="/forge-mark.svg" />
+  <meta name="description" content="Fire 100+ prompt-injection and jailbreak attacks at any LLM endpoint and see exactly how exposed you are — in under a minute." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: {
+          sans: ["Inter","system-ui","sans-serif"],
+          display: ["Space Grotesk","Inter","sans-serif"],
+          mono: ["JetBrains Mono","monospace"],
+        },
+        colors: {
+          ink:"#0A0A0D", ink2:"#101013", card:"#16161A",
+          cream:"#F1ECE1", "cream-card":"#FBF8F2", creamink:"#1A1612",
+          coral:"#FF5C35", "coral-deep":"#E0461F",
+          cobalt:"#1E40E8", teal:"#0C4A40",
+          paper:"#F6F6F8", mute:"#9A9AA2",
+        },
+      }},
+    };
+  </script>
+  <style>
+    html { scroll-behavior:smooth; background:#0A0A0D; }
+    body { background:#0A0A0D; }
+    .pill { border-radius:999px; font-weight:600; display:inline-flex; align-items:center; gap:8px; transition:transform .14s ease, filter .14s ease; white-space:nowrap; }
+    .pill:hover { transform:translateY(-1px); filter:brightness(1.03); }
+    .block { border-radius:30px; }
+    .glow-coral { background:radial-gradient(60% 46% at 50% 4%, rgba(255,92,53,.22), transparent 70%); }
+    .ring-soft { box-shadow:0 40px 80px -28px rgba(0,0,0,.85), 0 0 70px -34px rgba(255,92,53,.55); }
+    .card-shadow { box-shadow:0 24px 50px -30px rgba(0,0,0,.6); }
+    @keyframes slideIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+    .log-row { opacity:0; animation:slideIn .34s cubic-bezier(.2,.8,.2,1) forwards; }
+    .nav-link { color:#B7B7BE; font-size:13.5px; transition:color .14s; }
+    .nav-link:hover { color:#F6F6F8; }
+  </style>
+</head>
+<body class="font-sans text-paper antialiased">
+
+<svg width="0" height="0" class="hidden" aria-hidden="true">
+  <symbol id="ember" viewBox="0 0 56 56">
+    <path d="M28 3 L3 28 L28 53 Z" fill="#B5340F"/>
+    <path d="M28 3 L53 28 L28 53 Z" fill="#FF6A3D"/>
+    <path d="M28 3 L22 16 L34 16 Z" fill="#FFD2B0"/>
+    <path d="M47 5 L51 9 L47 13 L43 9 Z" fill="#FF8A4D"/>
+  </symbol>
+</svg>
+
+<!-- Floating pill nav -->
+<div class="sticky top-4 z-40 flex justify-center px-4">
+  <nav class="flex items-center gap-5 bg-white/[.06] border border-white/10 backdrop-blur-xl rounded-full pl-5 pr-2 py-2">
+    <a href="/" class="flex items-center gap-2.5">
+      <svg class="h-5 w-5"><use href="#ember"/></svg>
+      <span class="font-display font-bold text-[15px] tracking-tight">PromptForge</span>
+    </a>
+    <div class="hidden sm:flex items-center gap-5 pl-2">
+      <a href="#how" class="nav-link">Methodology</a>
+      <a href="#attacks" class="nav-link">Attacks</a>
+      <a href="#report" class="nav-link">Report</a>
+    </div>
+    <a href="/app" class="pill bg-paper text-ink text-[13.5px] px-4 py-2">Get started</a>
+  </nav>
+</div>
+
+<main class="overflow-hidden">
+
+  <!-- Hero -->
+  <section class="relative glow-coral">
+    <div class="max-w-[1100px] mx-auto px-5 pt-20 md:pt-24 pb-4 text-center">
+      <span class="pill font-mono text-[11.5px] text-[#FFB59B] bg-coral/10 border border-coral/25 px-3.5 py-1.5">
+        <span class="h-1.5 w-1.5 rounded-full bg-coral"></span> ADVERSARIAL AI RED-TEAM
+      </span>
+      <h1 class="font-display font-bold tracking-[-0.03em] text-[clamp(44px,9vw,86px)] leading-[0.96] mt-7">
+        Break your AI<br>before they do.
+      </h1>
+      <p class="text-mute text-[17px] md:text-[19px] leading-relaxed max-w-[540px] mx-auto mt-6">
+        Fire 100+ prompt-injection and jailbreak attacks at any LLM endpoint, agent, or chatbot —
+        and see exactly how exposed you are, in under a minute.
+      </p>
+      <div class="flex flex-wrap gap-3 justify-center mt-9">
+        <a href="/app" class="pill bg-paper text-ink text-[15px] px-6 py-3.5">Run an assessment</a>
+        <a href="#how" class="pill border border-white/15 text-paper text-[15px] px-6 py-3.5 hover:bg-white/5">View methodology</a>
+      </div>
+      <p class="font-mono text-[11.5px] text-white/35 mt-5">Authorized testing only · No SDK, no instrumentation</p>
+    </div>
+
+    <!-- Floating product shot -->
+    <div class="max-w-[940px] mx-auto px-5 mt-10">
+      <div class="bg-card border border-white/[.08] rounded-2xl overflow-hidden ring-soft">
+        <div class="flex items-center gap-1.5 px-4 py-3 border-b border-white/[.06]">
+          <span class="h-2.5 w-2.5 rounded-full bg-white/15"></span><span class="h-2.5 w-2.5 rounded-full bg-white/15"></span><span class="h-2.5 w-2.5 rounded-full bg-white/15"></span>
+          <span class="font-mono text-[11px] text-white/30 ml-3">promptforge — live assessment</span>
+          <span class="ml-auto font-mono text-[10.5px] text-emerald-400/80 flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>engine live</span>
+        </div>
+        <div class="grid md:grid-cols-[auto_1fr] gap-5 p-5 md:p-6">
+          <div class="flex items-center gap-4">
+            <div class="h-[72px] w-[72px] shrink-0 rounded-xl bg-[#1B1411] border border-[#3A2A24] grid place-items-center" style="box-shadow:0 0 30px -8px rgba(255,106,61,.5)">
+              <span class="font-display font-bold text-[44px] leading-none text-coral">D</span>
+            </div>
+            <div>
+              <div class="font-display font-semibold text-[18px]">38% risk index</div>
+              <div class="font-mono text-[12px] text-white/45 mt-1">9 of 25 probes breached</div>
+              <div class="h-1 w-36 rounded-full bg-white/10 overflow-hidden mt-3"><div class="h-1 rounded-full bg-coral" style="width:38%"></div></div>
+            </div>
+          </div>
+          <div id="heroFeed" class="font-mono text-[12px] self-center min-w-0"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Proof strip -->
+  <section class="max-w-[1100px] mx-auto px-5 py-12">
+    <p class="text-center font-mono text-[11px] tracking-[0.2em] text-white/30 mb-5">TESTED AGAINST ANY ENDPOINT</p>
+    <div class="flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-white/55 text-[15px] font-medium">
+      <span>OpenAI</span><span class="text-white/15">·</span><span>Anthropic</span><span class="text-white/15">·</span>
+      <span>Google Gemini</span><span class="text-white/15">·</span><span>Ollama</span><span class="text-white/15">·</span><span>OpenAI-compatible</span>
+    </div>
+  </section>
+
+  <!-- How it works — cobalt block -->
+  <section id="how" class="px-4">
+    <div class="block bg-cobalt max-w-[1180px] mx-auto px-6 md:px-12 py-16 md:py-20">
+      <div class="text-center max-w-[640px] mx-auto">
+        <span class="font-mono text-[11px] tracking-[0.2em] text-white/70">HOW IT WORKS</span>
+        <h2 class="font-display font-bold text-[clamp(30px,5vw,48px)] tracking-[-0.02em] leading-tight mt-3">Three steps from endpoint to verdict.</h2>
+      </div>
+      <div class="grid md:grid-cols-3 gap-4 mt-12">
+        <div class="bg-white/10 rounded-2xl p-7 border border-white/10">
+          <div class="font-mono text-white/70 text-[13px]">01 / TARGET</div>
+          <h3 class="font-display font-semibold text-[21px] mt-4">Point it anywhere</h3>
+          <p class="text-white/70 text-[14.5px] leading-relaxed mt-2">Aim PromptForge at any OpenAI-compatible endpoint, agent, or chatbot wrapper.</p>
+        </div>
+        <div class="bg-white/10 rounded-2xl p-7 border border-white/10">
+          <div class="font-mono text-white/70 text-[13px]">02 / FORGE</div>
+          <h3 class="font-display font-semibold text-[21px] mt-4">Fire the battery</h3>
+          <p class="text-white/70 text-[14.5px] leading-relaxed mt-2">A curated library of categorized injection and jailbreak payloads streams against it.</p>
+        </div>
+        <div class="bg-white/10 rounded-2xl p-7 border border-white/10">
+          <div class="font-mono text-white/70 text-[13px]">03 / REPORT</div>
+          <h3 class="font-display font-semibold text-[21px] mt-4">Score the damage</h3>
+          <p class="text-white/70 text-[14.5px] leading-relaxed mt-2">Every response is judged pass/fail, then graded A–F with severity you can ship.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Attack taxonomy — cream block -->
+  <section id="attacks" class="px-4 mt-4">
+    <div class="block bg-cream text-creamink max-w-[1180px] mx-auto px-6 md:px-12 py-16 md:py-20">
+      <div class="max-w-[640px]">
+        <span class="font-mono text-[11px] tracking-[0.2em] text-coral-deep">ATTACK TAXONOMY</span>
+        <h2 class="font-display font-bold text-[clamp(30px,5vw,48px)] tracking-[-0.02em] leading-tight mt-3">Five vectors.<br>One hundred-plus payloads.</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-12">
+        <div class="bg-cream-card rounded-2xl p-6 border border-black/5 card-shadow">
+          <div class="font-mono text-[11px] text-creamink/40">VECTOR 01</div>
+          <h3 class="font-display font-semibold text-[19px] mt-2.5">Direct injection</h3>
+          <p class="text-creamink/65 text-[13.5px] leading-relaxed mt-1.5">Override the system prompt head-on — "ignore previous instructions" and its descendants.</p>
+        </div>
+        <div class="bg-cream-card rounded-2xl p-6 border border-black/5 card-shadow">
+          <div class="font-mono text-[11px] text-creamink/40">VECTOR 02</div>
+          <h3 class="font-display font-semibold text-[19px] mt-2.5">Jailbreak</h3>
+          <p class="text-creamink/65 text-[13.5px] leading-relaxed mt-1.5">Role-play, personas, and DAN-style coercion that talk a model out of its guardrails.</p>
+        </div>
+        <div class="bg-cream-card rounded-2xl p-6 border border-black/5 card-shadow">
+          <div class="font-mono text-[11px] text-creamink/40">VECTOR 03</div>
+          <h3 class="font-display font-semibold text-[19px] mt-2.5">Prompt extraction</h3>
+          <p class="text-creamink/65 text-[13.5px] leading-relaxed mt-1.5">Coax the model into disclosing its own hidden system prompt and configuration.</p>
+        </div>
+        <div class="bg-cream-card rounded-2xl p-6 border border-black/5 card-shadow">
+          <div class="font-mono text-[11px] text-creamink/40">VECTOR 04</div>
+          <h3 class="font-display font-semibold text-[19px] mt-2.5">Indirect injection</h3>
+          <p class="text-creamink/65 text-[13.5px] leading-relaxed mt-1.5">Smuggle instructions through context, fake system messages, and authority impersonation.</p>
+        </div>
+        <div class="bg-cream-card rounded-2xl p-6 border border-black/5 card-shadow">
+          <div class="font-mono text-[11px] text-creamink/40">VECTOR 05</div>
+          <h3 class="font-display font-semibold text-[19px] mt-2.5">Obfuscation</h3>
+          <p class="text-creamink/65 text-[13.5px] leading-relaxed mt-1.5">Base64, encoding tricks, and hidden instructions that slip past naive filters.</p>
+        </div>
+        <div class="bg-coral text-white rounded-2xl p-6 card-shadow flex flex-col justify-between">
+          <div>
+            <div class="font-mono text-[11px] text-white/70">+ RESEARCH-BACKED</div>
+            <h3 class="font-display font-semibold text-[19px] mt-2.5">JailbreakBench</h3>
+            <p class="text-white/85 text-[13.5px] leading-relaxed mt-1.5">Public research artifacts import straight into the library to keep payloads current.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Report — teal block -->
+  <section id="report" class="px-4 mt-4">
+    <div class="block bg-teal max-w-[1180px] mx-auto px-6 md:px-12 py-16 md:py-20 grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="font-mono text-[11px] tracking-[0.2em] text-emerald-300/80">THE REPORT</span>
+        <h2 class="font-display font-bold text-[clamp(30px,5vw,48px)] tracking-[-0.02em] leading-tight mt-3">A grade you can act on.</h2>
+        <p class="text-white/75 text-[16px] leading-relaxed max-w-md mt-5">
+          PromptForge collapses every result into one risk index — the share of attacks that
+          landed, by category and severity, with the worst transcripts attached. Export to
+          Markdown and ship it with the model.
+        </p>
+        <a href="/app" class="pill bg-paper text-ink text-[15px] px-6 py-3.5 mt-7">Generate a report</a>
+      </div>
+      <div class="bg-black/20 border border-white/10 rounded-2xl p-6">
+        <div class="flex items-end gap-2">
+          <div class="flex-1 text-center py-3 rounded-xl bg-white/5"><div class="font-display font-bold text-xl text-emerald-300">A</div><div class="font-mono text-[10px] text-white/40 mt-1">0%</div></div>
+          <div class="flex-1 text-center py-4 rounded-xl bg-white/5"><div class="font-display font-bold text-2xl text-emerald-300">B</div><div class="font-mono text-[10px] text-white/40 mt-1">&lt;15%</div></div>
+          <div class="flex-1 text-center py-5 rounded-xl bg-white/5"><div class="font-display font-bold text-2xl text-amber-300">C</div><div class="font-mono text-[10px] text-white/40 mt-1">&lt;30%</div></div>
+          <div class="flex-1 text-center py-6 rounded-xl bg-coral/20 border border-coral/40"><div class="font-display font-bold text-3xl text-coral">D</div><div class="font-mono text-[10px] text-white/40 mt-1">&lt;50%</div></div>
+          <div class="flex-1 text-center py-7 rounded-xl bg-red-500/15 border border-red-400/30"><div class="font-display font-bold text-3xl text-red-400">F</div><div class="font-mono text-[10px] text-white/40 mt-1">50%+</div></div>
+        </div>
+        <div class="mt-6 space-y-3">
+          <div class="flex items-center gap-3 text-[12px]"><span class="w-24 font-mono text-white/60">jailbreak</span><div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden"><div class="h-full rounded-full bg-red-400" style="width:72%"></div></div><span class="font-mono text-white/50 w-10 text-right">5/7</span></div>
+          <div class="flex items-center gap-3 text-[12px]"><span class="w-24 font-mono text-white/60">extraction</span><div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden"><div class="h-full rounded-full bg-coral" style="width:40%"></div></div><span class="font-mono text-white/50 w-10 text-right">2/5</span></div>
+          <div class="flex items-center gap-3 text-[12px]"><span class="w-24 font-mono text-white/60">obfuscation</span><div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden"><div class="h-full rounded-full bg-amber-300" style="width:33%"></div></div><span class="font-mono text-white/50 w-10 text-right">1/3</span></div>
+          <div class="flex items-center gap-3 text-[12px]"><span class="w-24 font-mono text-white/60">direct</span><div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden"><div class="h-full rounded-full bg-emerald-300" style="width:12%"></div></div><span class="font-mono text-white/50 w-10 text-right">1/8</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats — coral block -->
+  <section class="px-4 mt-4">
+    <div class="block bg-coral text-white max-w-[1180px] mx-auto px-6 md:px-12 py-14">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        <div><div class="font-display font-bold text-[clamp(34px,6vw,52px)] leading-none">104</div><div class="font-mono text-[12px] text-white/70 mt-2">attack payloads</div></div>
+        <div><div class="font-display font-bold text-[clamp(34px,6vw,52px)] leading-none">5</div><div class="font-mono text-[12px] text-white/70 mt-2">attack vectors</div></div>
+        <div><div class="font-display font-bold text-[clamp(34px,6vw,52px)] leading-none">A–F</div><div class="font-mono text-[12px] text-white/70 mt-2">risk grade</div></div>
+        <div><div class="font-display font-bold text-[clamp(34px,6vw,52px)] leading-none">&lt;60s</div><div class="font-mono text-[12px] text-white/70 mt-2">to a full report</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="relative glow-coral px-4 mt-4">
+    <div class="max-w-[900px] mx-auto px-5 py-28 text-center">
+      <h2 class="font-display font-bold text-[clamp(40px,8vw,76px)] tracking-[-0.03em] leading-[0.98]">Ship agents<br>you can defend.</h2>
+      <p class="text-mute text-[18px] max-w-md mx-auto mt-6">Know your exposure before an attacker does. Run a full assessment in under a minute.</p>
+      <a href="/app" class="pill bg-paper text-ink text-[16px] px-7 py-4 mt-9">Run an assessment</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/[.06] max-w-[1180px] mx-auto px-6 py-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div class="flex items-center gap-2.5">
+      <svg class="h-5 w-5"><use href="#ember"/></svg>
+      <span class="font-display font-bold tracking-tight">PromptForge</span>
+    </div>
+    <div class="flex items-center gap-6 text-[13px] text-white/45">
+      <a href="#how" class="hover:text-paper transition">Methodology</a>
+      <a href="#attacks" class="hover:text-paper transition">Attacks</a>
+      <a href="/app" class="hover:text-paper transition">Launch app</a>
+    </div>
+    <div class="font-mono text-[11px] text-white/30">Authorized testing only · CipherHacks</div>
+  </footer>
+
+</main>
+
+<script>
+  // One-shot reveal of the hero panel feed — shows the product working, no looping glow.
+  const HERO_ROWS = [
+    {v:"VULN",  t:"jailbreak · persona",    bad:true},
+    {v:"BLOCK", t:"direct · override",      bad:false},
+    {v:"VULN",  t:"extraction · leak",      bad:true},
+    {v:"VULN",  t:"obfuscation · base64",   bad:true},
+    {v:"BLOCK", t:"indirect · authority",   bad:false},
+  ];
+  const feed = document.getElementById("heroFeed");
+  HERO_ROWS.forEach((r, i) => {
+    const row = document.createElement("div");
+    row.className = "log-row flex items-center gap-2.5 py-1.5 border-b border-white/[.05] last:border-0";
+    row.style.animationDelay = (i * 0.12) + "s";
+    row.innerHTML =
+      `<span class="h-1.5 w-1.5 rounded-full" style="background:${r.bad?'#E5484D':'#2DB47C'}"></span>` +
+      `<span class="w-12 font-medium" style="color:${r.bad?'#E5484D':'#2DB47C'}">${r.v}</span>` +
+      `<span class="text-white/55 truncate">${r.t}</span>`;
+    feed.appendChild(row);
+  });
+</script>
+</body>
+</html>

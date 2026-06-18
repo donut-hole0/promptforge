@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PromptForge">
+  <g transform="translate(4 4)">
+    <path d="M28 3 L3 28 L28 53 Z" fill="#B5340F"/>
+    <path d="M28 3 L53 28 L28 53 Z" fill="#FF6A3D"/>
+    <path d="M28 3 L22 16 L34 16 Z" fill="#FFD2B0"/>
+    <line x1="28" y1="6" x2="28" y2="50" stroke="#FFC09A" stroke-width="1.2"/>
+    <path d="M47 5 L51 9 L47 13 L43 9 Z" fill="#FF8A4D"/>
+    <path d="M39 2.5 L41.5 5 L39 7.5 L36.5 5 Z" fill="#FFC09A"/>
+  </g>
+</svg>

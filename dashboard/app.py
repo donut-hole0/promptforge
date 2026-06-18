@@ -159,8 +159,18 @@ def _mock_report(scan_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 @app.get("/")
-async def index() -> FileResponse:
+async def landing() -> FileResponse:
+    return FileResponse(STATIC / "landing.html")
+
+
+@app.get("/app")
+async def app_ui() -> FileResponse:
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/forge-mark.svg")
+async def forge_mark() -> FileResponse:
+    return FileResponse(STATIC / "forge-mark.svg")
 
 
 @app.get("/api/health")
