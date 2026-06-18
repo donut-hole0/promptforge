@@ -143,4 +143,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
+    # Port 9000 (not 8000) to avoid colliding with the PromptForge engine.
+    uvicorn.run("vulnerable_bot:app", host="127.0.0.1", port=9000, reload=True)

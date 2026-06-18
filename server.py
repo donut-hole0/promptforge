@@ -33,7 +33,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from attacks.load import load_attacks
+from engine.attack_loader import load_attacks
 from engine.runner import AttackResult, Runner, TargetConfig
 
 load_dotenv()
@@ -75,6 +75,8 @@ class StartResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _api_key_for(provider: str) -> str:
+    if provider == "ollama":
+        return "ollama"  # litellm needs a non-empty string; Ollama itself needs no key
     mapping = {
         "anthropic": "ANTHROPIC_API_KEY",
         "openai": "OPENAI_API_KEY",
@@ -183,3 +185,14 @@ async def get_report(scan_id: str):
 
     target = _scan_targets[scan_id]
     return _build_report(scan_id, target)
+
+
+# ---------------------------------------------------------------------------
+# Entrypoint — `python server.py` starts the engine on :8000 (override with PORT)
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="127.0.0.1", port=port)

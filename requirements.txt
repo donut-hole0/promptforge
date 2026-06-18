@@ -5,3 +5,5 @@ openai
 google-genai
 python-dotenv
 truststore
+httpx
+litellm

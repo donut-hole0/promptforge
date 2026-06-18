@@ -14,17 +14,16 @@ promptforge/
 │   ├── requirements.txt    # Engine dependencies
 │   └── erunner.py          # (deprecated scaffold, not used)
 │
-├── dashboard/              # P3: React frontend dashboard
-│   ├── src/
-│   │   ├── App.tsx        # Main dashboard component (live results, reports)
-│   │   ├── App.css        # Styling
-│   │   ├── main.tsx       # React entrypoint
-│   │   └── index.css      # Global styles
-│   ├── index.html         # HTML shell
-│   ├── package.json       # Frontend dependencies (React 18, Vite)
-│   ├── vite.config.ts     # Vite configuration with API proxy
-│   ├── tsconfig.json      # TypeScript config
-│   └── tsconfig.node.json
+├── dashboard/              # P3: real-time dashboard
+│   ├── app.py             # ACTIVE: FastAPI server — serves the UI + proxies
+│   │                      #   to the engine (mock fallback when engine offline)
+│   ├── static/
+│   │   └── index.html     # ACTIVE: single-file dashboard UI (Tailwind + JS)
+│   └── src/               # DEPRECATED: earlier React/Vite prototype, unused
+│       ├── App.tsx        #   (kept for reference; not wired into startup)
+│       ├── App.css
+│       ├── main.tsx
+│       └── index.css
 │
 ├── demo_bot/               # Demo: Intentionally vulnerable FastAPI chatbot
 │   ├── vulnerable_bot.py  # Weak bot for live demo (direct prompt injection)
@@ -56,8 +55,9 @@ promptforge/
    - Streams results via SSE to the dashboard
    - Generates final report with risk score, breakdown by category, successful attack samples
 
-2. **Dashboard (`dashboard/src/App.tsx`):**
-   - React + Vite frontend on http://localhost:3000
+2. **Dashboard (`dashboard/app.py` + `dashboard/static/index.html`):**
+   - FastAPI server on http://localhost:8050 that serves a single-file UI and
+     proxies API calls to the engine (with a local mock fallback when offline)
    - Config form to select provider, model, system prompt
    - Live results grid showing attacks as red (succeeded) or green (failed)
    - Final report with:
@@ -76,7 +76,7 @@ promptforge/
    - Each has a `success_signal` for heuristic judging
 
 4. **Demo Target (`demo_bot/vulnerable_bot.py`):**
-   - Intentionally weak FastAPI bot running on http://localhost:8000
+   - Intentionally weak FastAPI bot running on http://localhost:9000
    - Direct concatenation of system prompt + user message (no protection)
    - Connected to local Ollama (`qwen3:4b`)
    - Used for live demo where judges watch PromptForge test it in real-time
@@ -105,13 +105,7 @@ cp .env.example .env
 # Edit .env with your API keys
 ```
 
-### 2. Install frontend
-```bash
-cd dashboard
-npm install
-```
-
-### 3. Start everything
+### 2. Start everything
 
 **Linux/Mac:**
 ```bash
@@ -125,24 +119,26 @@ start.cmd
 
 Or manually:
 ```bash
-# Terminal 1: Backend
+# Terminal 1: Engine
 python server.py
 
 # Terminal 2: Dashboard
-cd dashboard
-npm run dev
+python -m uvicorn dashboard.app:app --port 8050
 
 # Terminal 3 (optional): Demo target
 cd demo_bot
 pip install -r requirements.txt
-uvicorn vulnerable_bot:app --reload --port 8000
+uvicorn vulnerable_bot:app --reload --port 9000
 ```
 
-### 4. Use it
-- Backend: http://localhost:8000 (FastAPI server)
-- Dashboard: http://localhost:3000
-- API Docs: http://localhost:8000/docs
-- Demo bot: http://localhost:9000 (if running separately on different port)
+> The dashboard runs fine on its own — if the engine is offline it falls back to
+> a local mock generator so the UI still demos. Start the engine for real scans.
+
+### 3. Use it
+- Engine:    http://localhost:8000 (FastAPI server)
+- Dashboard: http://localhost:8050
+- API Docs:  http://localhost:8000/docs
+- Demo bot:  http://localhost:9000 (optional, separate target)
 
 ## For Live Demo (Hackathon)
 
