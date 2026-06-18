@@ -11,6 +11,7 @@ local mock generator so the UI still works offline for development/demo.
 Endpoints (mirror server.py so the UI speaks one API):
   GET  /                       -> dashboard UI
   GET  /api/health             -> is the engine reachable? (live vs mock)
+  GET  /api/config             -> pre-fill API keys from .env
   POST /api/start              -> start a scan        (proxied, or mock)
   GET  /api/stream/{scan_id}   -> SSE result stream   (proxied, or mock)
   GET  /api/report/{scan_id}   -> final report JSON   (proxied, or mock)
@@ -33,8 +34,11 @@ import uuid
 from pathlib import Path
 
 import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
+
+load_dotenv()
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
@@ -107,7 +111,6 @@ async def _run_mock_scan(scan_id: str, attacks: list[dict]) -> None:
     total = len(attacks)
     try:
         for attack in attacks:
-            # Faster per-attack for a large library so a full demo stays snappy.
             await asyncio.sleep(random.uniform(0.12, 0.3) if total > 20 else random.uniform(0.4, 1.0))
             succeeded = random.random() < 0.5
             result = {
@@ -125,7 +128,7 @@ async def _run_mock_scan(scan_id: str, attacks: list[dict]) -> None:
             await queue.put(result)
     finally:
         _mock_complete[scan_id] = True
-        await queue.put(None)  # sentinel — closes the SSE stream
+        await queue.put(None)
 
 
 def _mock_report(scan_id: str) -> dict:
@@ -166,9 +169,26 @@ async def health() -> dict:
     return {"engine": "up" if up else "offline", "mode": "live" if up else "mock"}
 
 
+@app.get("/api/config")
+async def config() -> dict:
+    """Return API keys from .env so the UI can pre-fill the key field."""
+    return {
+        "google_api_key":    os.getenv("GOOGLE_API_KEY", ""),
+        "anthropic_api_key": os.getenv("ANTHROPIC_API_KEY", ""),
+        "openai_api_key":    os.getenv("OPENAI_API_KEY", ""),
+    }
+
+
 @app.post("/api/start")
 async def start_scan(request: Request) -> dict:
     body = await request.body()
+    payload = json.loads(body) if body else {}
+
+    # If the UI sent an API key, inject it into env so litellm picks it up.
+    if payload.get("api_key"):
+        env_map = {"google": "GOOGLE_API_KEY", "anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
+        if env_var := env_map.get(payload.get("provider", "")):
+            os.environ[env_var] = payload["api_key"]
 
     # Live: forward to the real engine.
     if await engine_is_up():
@@ -214,7 +234,7 @@ async def stream_results(scan_id: str) -> StreamingResponse:
         while True:
             result = await queue.get()
             if result is None:
-                yield 'data: {"event": "done"}\n\n'
+                yield 'data: {"event":"done"}\n\n'
                 break
             yield f"data: {json.dumps(result)}\n\n"
 
@@ -226,7 +246,7 @@ async def stream_results(scan_id: str) -> StreamingResponse:
 
 
 @app.get("/api/report/{scan_id}")
-async def get_report(scan_id: str):
+async def get_report(scan_id: str) -> dict:
     if await engine_is_up():
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.get(f"{ENGINE_URL}/api/report/{scan_id}")

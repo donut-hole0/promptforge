@@ -75,6 +75,8 @@ class StartResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _api_key_for(provider: str) -> str:
+    if provider == "ollama":
+        return "ollama"  # litellm needs a non-empty string; Ollama itself needs no key
     mapping = {
         "anthropic": "ANTHROPIC_API_KEY",
         "openai": "OPENAI_API_KEY",

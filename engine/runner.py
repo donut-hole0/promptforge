@@ -55,7 +55,7 @@ class TargetConfig:
 
 
 def _litellm_model(provider: str, model: str) -> str:
-    prefix = {"anthropic": "", "openai": "", "google": "gemini/"}
+    prefix = {"anthropic": "", "openai": "", "google": "gemini/", "ollama": "ollama/"}
     return prefix.get(provider, "") + model
 
 
