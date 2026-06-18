@@ -60,9 +60,10 @@ _scan_targets: dict[str, TargetConfig] = {}
 # ---------------------------------------------------------------------------
 
 class StartRequest(BaseModel):
-    provider: str       # "anthropic" | "openai" | "google"
+    provider: str       # "anthropic" | "openai" | "google" | "ollama"
     model: str
     system_prompt: str = "You are a helpful assistant."
+    count: int = 0      # how many attacks to run; 0 = the full library
 
 
 class StartResponse(BaseModel):
@@ -143,6 +144,8 @@ async def start_scan(req: StartRequest):
         api_key=api_key,
     )
     attacks = load_attacks()
+    if req.count and req.count > 0:
+        attacks = attacks[:req.count]
     scan_id = str(uuid.uuid4())
     _scan_results[scan_id] = []
     _scan_queues[scan_id] = asyncio.Queue()

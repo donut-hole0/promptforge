@@ -95,6 +95,11 @@
           <option value="llama3.2:1b">llama3.2:1b</option>
         </select>
       </label>
+      <label class="block px-4 py-3 border-t lg:border-t-0 lg:border-r divider">
+        <div class="text-[11px] text-sub mb-1">Attacks <span id="cfgCountMax" class="text-muted"></span></div>
+        <input id="cfgCount" type="number" min="1" value="25" spellcheck="false"
+          class="w-full text-xs font-mono text-white focus:outline-none" />
+      </label>
       <label id="apiKeyLabel" class="block px-4 py-3 border-t lg:border-t-0 lg:border-r divider">
         <div class="text-[11px] text-sub mb-1">API Key</div>
         <input id="cfgApiKey" type="password" placeholder="sk- / AIza…" spellcheck="false"
@@ -328,12 +333,24 @@
       color.replace("text-","bg-").replace("acc-hi","[#5287cc]") + (pulse?" blinking":"");
   }
 
+  // Lock the target config while a scan is in flight so the model/provider
+  // can't be switched mid-run (which would mislabel results).
+  function lockControls(locked) {
+    ["cfgProvider","cfgModel","cfgCount","cfgApiKey"].forEach(id=>{
+      const el = $(id);
+      el.disabled = locked;
+      el.classList.toggle("opacity-40", locked);
+      el.classList.toggle("cursor-not-allowed", locked);
+    });
+  }
+
   async function startScan() {
     Object.assign(state,{fired:0,total:0,vulns:0,blocked:0,results:[],scanId:null});
     $("feed").innerHTML="";
     $("report").classList.add("hidden");
     $("empty").classList.remove("hidden");
     $("scanBtn").disabled = true;
+    lockControls(true);
     setStatus("running","text-acc-hi",true);
     renderStats();
 
@@ -344,6 +361,7 @@
         model:$("cfgModel").value,
         system_prompt:$("cfgSystemPrompt").value,
         api_key:$("cfgApiKey").value||undefined,
+        count:parseInt($("cfgCount").value)||0,
       }),
     });
     const data = await res.json();
@@ -355,7 +373,7 @@
     es.onmessage = e => {
       const a = JSON.parse(e.data);
       if (a.event==="done") {
-        es.close(); $("scanBtn").disabled=false;
+        es.close(); $("scanBtn").disabled=false; lockControls(false);
         setStatus("complete","text-emerald-400",false);
         fetch(`/api/report/${state.scanId}`).then(r=>r.json()).then(renderReport).catch(()=>renderReport(null));
       } else {
@@ -363,7 +381,7 @@
         state.results.push(a); addRow(a); renderStats();
       }
     };
-    es.onerror = ()=>{ es.close(); $("scanBtn").disabled=false; setStatus("error","text-red-400",false); };
+    es.onerror = ()=>{ es.close(); $("scanBtn").disabled=false; lockControls(false); setStatus("error","text-red-400",false); };
   }
 
   function exportReport() {
