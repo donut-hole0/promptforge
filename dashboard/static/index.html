@@ -222,6 +222,7 @@
 
   <main class="max-w-[1240px] mx-auto px-5 py-6 space-y-5">
 
+<<<<<<< HEAD
     <!-- ───────────────────────── Briefing ───────────────────────── -->
     <section class="panel overflow-hidden">
       <div class="flex items-center justify-between px-4 h-10 border-b hairline">
@@ -230,6 +231,106 @@
           <span class="eyebrow text-muted-foreground">Target Briefing</span>
         </div>
         <span id="modeTag" class="font-mono text-[11px] text-subtle">checking engine…</span>
+=======
+<script>
+  const SEV = {
+    critical:{label:"critical",cls:"text-red-400"},
+    high:    {label:"high",    cls:"text-orange-400"},
+    medium:  {label:"medium",  cls:"text-amber-400"},
+    low:     {label:"low",     cls:"text-sky-400"},
+    info:    {label:"info",    cls:"text-sub"},
+  };
+
+  const state = {fired:0,total:0,vulns:0,blocked:0,results:[],scanId:null};
+  const $ = id => document.getElementById(id);
+  const esc = s => s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  // Models available per provider. The Ollama list is what's pulled locally;
+  // the cloud lists use current, non-deprecated model IDs.
+  const MODELS_BY_PROVIDER = {
+    ollama:    ["qwen2.5:0.5b","deepseek-r1:1.5b","llama3.2:1b"],
+    google:    ["gemini-2.0-flash","gemini-2.5-flash","gemini-2.5-flash-lite"],
+    anthropic: ["claude-haiku-4-5","claude-sonnet-4-5"],
+    openai:    ["gpt-4o-mini","gpt-4o"],
+  };
+
+  // Rebuild the model dropdown to match the selected provider, and show the
+  // API-key field only for cloud providers (Ollama is local, needs no key).
+  function syncProvider() {
+    const p = $("cfgProvider").value;
+    $("apiKeyLabel").style.display = p === "ollama" ? "none" : "";
+    $("cfgModel").innerHTML = (MODELS_BY_PROVIDER[p] || [])
+      .map(m => `<option value="${m}">${m}</option>`).join("");
+  }
+  syncProvider();
+  $("cfgProvider").addEventListener("change", syncProvider);
+
+  // Pre-fill the API key from the server's .env when one is configured.
+  fetch("/api/config").then(r=>r.json()).then(d=>{
+    const providerKey = {google:"google_api_key",anthropic:"anthropic_api_key",openai:"openai_api_key"};
+    function fillKey() {
+      const p = $("cfgProvider").value;
+      $("cfgApiKey").value = p === "ollama" ? "" : (d[providerKey[p]] || "");
+    }
+    fillKey();
+    $("cfgProvider").addEventListener("change", fillKey);
+  }).catch(()=>{});
+
+  // Engine mode indicator
+  fetch("/api/health").then(r=>r.json()).then(d=>{
+    const live = d.mode === "live";
+    $("modeTag").textContent = live ? "● engine connected — live mode" : "○ engine offline — mock mode";
+    $("modeTag").className = "text-[11px] font-mono " + (live ? "text-emerald-500" : "text-sub");
+  }).catch(()=>{});
+
+  function tick(el, to) {
+    const from = parseInt(el.textContent)||0;
+    if (from===to) return;
+    const step = to>from?1:-1; let cur=from;
+    const t = setInterval(()=>{ cur+=step; el.textContent=cur; if(cur===to) clearInterval(t); },25);
+  }
+
+  function renderStats() {
+    tick($("statFired"), state.fired);
+    $("statTotal").textContent = state.total ? ` / ${state.total}` : "";
+    tick($("statVulns"), state.vulns);
+    tick($("statBlocked"), state.blocked);
+    const rate = state.fired ? Math.round((state.vulns/state.fired)*100) : null;
+    $("statRate").textContent = rate !== null ? rate+"%" : "—";
+    $("statRate").className = "text-2xl font-semibold tnum leading-none " +
+      (rate===null?"text-white":rate>=30?"text-red-400":rate>0?"text-amber-400":"text-emerald-400");
+    $("progress").style.width = state.total ? (state.fired/state.total)*100+"%" : "0%";
+    $("counter").textContent = state.total ? `${state.fired} / ${state.total}` : "";
+  }
+
+  let activeFilter = "all";
+  function applyFilter() {
+    document.querySelectorAll("#feed > [data-verdict]").forEach(row => {
+      row.classList.toggle("hidden", activeFilter!=="all" && activeFilter!==row.dataset.verdict);
+    });
+  }
+
+  function addRow(a) {
+    $("empty").classList.add("hidden");
+    const sev = SEV[a.severity] || SEV.info;
+    const pass = !a.succeeded;
+    const row = document.createElement("div");
+    row.dataset.verdict = a.succeeded ? "vuln" : "blocked";
+    row.className = "row-in";
+    row.innerHTML = `
+      <div class="summary grid items-center px-4 py-2.5 cursor-pointer hover:bg-white/[.025] transition-colors text-xs"
+           style="grid-template-columns:2rem 3.5rem 1fr 5rem 3rem">
+        <span class="font-mono text-muted">${String(state.fired).padStart(2,"0")}</span>
+        <span class="${pass?"text-emerald-400":"text-red-400"} font-medium flex items-center gap-1.5">
+          <span class="h-1.5 w-1.5 rounded-full ${pass?"bg-emerald-500":"bg-red-500"} shrink-0"></span>
+          ${pass?"PASS":"FAIL"}
+        </span>
+        <span class="font-mono text-sub truncate pr-3">
+          ${esc(a.category)} <span class="text-muted">·</span> ${esc(a.technique||"")}
+        </span>
+        <span class="${sev.cls} uppercase tracking-wide">${sev.label}</span>
+        <span class="font-mono text-muted text-right tnum">${(a.confidence||0).toFixed(2)}</span>
+>>>>>>> a3cac49c0efb33dfa274d07ba7b3f9c54a2ee51b
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-12">
